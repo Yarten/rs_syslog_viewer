@@ -1,0 +1,10 @@
+[package]
+name = "rs_syslog_viewer"
+version = "0.1.0"
+edition = "2024"
+
+[dependencies]
+tokio = { version = "1.48.0", features = ["full"] }
+tokio-util = "0.7.17"
+notify = "8.1.0"
+anyhow = "1.0.100"
