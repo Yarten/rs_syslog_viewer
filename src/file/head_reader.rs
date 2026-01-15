@@ -27,8 +27,11 @@ pub struct HeadReader {
   tx: mpsc::Sender<Event>,
   rx: mpsc::Receiver<Event>,
 
+  /// 监听文件路径变化的 join handler
+  jh_watching: Option<JoinHandle<()>>,
+
   /// 异步读取的 join handler
-  jh: Option<JoinHandle<()>>,
+  jh_reading: Option<JoinHandle<()>>,
 }
 
 impl Reader for HeadReader {
@@ -52,17 +55,23 @@ impl Reader for HeadReader {
       cancel_token: CancellationToken::new(),
       tx,
       rx,
-      jh: None,
+      jh_watching: None,
+      jh_reading: None,
     })
   }
 
   async fn start(&mut self) -> Result<()> {
-    todo!()
+    self.jh_watching = Some(self.spawn_watching()?);
+    self.jh_reading = Some(self.spawn_reading());
+    Ok(())
   }
 
   async fn stop(&mut self) -> Result<()> {
     self.cancel_token.cancel();
-    if let Some(jh) = self.jh.take() {
+    if let Some(jh) = self.jh_watching.take() {
+      jh.await?;
+    }
+    if let Some(jh) = self.jh_reading.take() {
       jh.await?;
     }
     Ok(())
@@ -95,16 +104,18 @@ impl HeadReader {
           _ = cancel_token.cancelled() => { break 'watch_loop; },
 
           // 监控文件的路径变化
-          res = watcher.changed() => {
-            if let Err(e) = res {
+          res = watcher.changed() => match res {
+            Err(e) => {
               eprintln!("watcher error: {:?}", e);
               break 'watch_loop;
-            } else if let Ok(ChangedEvent::Metadata(event)) = res {
+            },
+            Ok(ChangedEvent::Metadata(event)) => {
               if (event.send(&tx).await) {
                   break 'watch_loop;
               }
-            }
-          }
+            },
+            _ => {}
+          },
         }
       }
     }))
@@ -123,27 +134,22 @@ impl HeadReader {
 
     // 启动新协程，一直读取文件，直到读取不到内容
     tokio::spawn(async move {
-      // 创建文件系统监视器
-      let mut watcher = match state.watcher(config.poll_interval) {
-        Ok(w) => w,
-        Err(e) => {
-          eprintln!("Failed to watch watcher: {e}");
-          return;
-        }
-      };
-
       // 用于读取的缓存
       let mut buffer = vec![0; config.buffer_size as usize];
 
-      // 记录上一次读取的位置
-      let mut last_position = state.position();
+      // 一直读取到文件结尾
+      while !cancel_token.is_cancelled() {
+        // 记录上一次读取的位置
+        let last_position = state.position();
 
-      'watch_loop: loop {
-        tokio::select! {
-            // 外部的取消信号
-            _ = cancel_token.cancelled() => { break 'watch_loop; },
+        if let Err(e) = Self::read_tail_lines(&mut buffer, &mut state).await {
+          eprintln!("Error while reading tail lines: {e}");
+          break;
+        }
 
-
+        // 没有读取到新内容，则退出
+        if state.position() == last_position {
+          break;
         }
       }
     })

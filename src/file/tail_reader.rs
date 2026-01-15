@@ -191,22 +191,22 @@ impl TailReader {
 
           // 监控文件变化
           res = watcher.changed() => match res {
-            Ok(event) => match event {
-              // 文件元数据变更，可能是重命名或者被删除。如果被删除，则结束监听
-              ChangedEvent::Metadata(event) => {
-                if (event.send(&tx).await) {
-                  break 'watch_loop;
-                }
+            // 文件元数据变更，可能是重命名或者被删除。如果被删除，则结束监听
+            Ok(ChangedEvent::Metadata(event)) => {
+              if (event.send(&tx).await) {
+                break 'watch_loop;
               }
-
-              // 文件变更，对于我们从尾部读取的情况来说，就是尾部新增了内容
-              ChangedEvent::Content => {
-                if let Err(e) = Self::read_tail_lines(&mut buffer, &mut state).await {
-                  eprintln!("Error while reading tail lines: {e}");
-                  break 'watch_loop;
-                }
+            },
+            
+            // 文件变更，对于我们从尾部读取的情况来说，就是尾部新增了内容
+            Ok(ChangedEvent::Content) => {
+              if let Err(e) = Self::read_tail_lines(&mut buffer, &mut state).await {
+                eprintln!("Error while reading tail lines: {e}");
+                break 'watch_loop;
               }
-            }
+            },
+            
+            // 出现错误则报错退出
             Err(e) => {
               eprintln!("Failed to watch watcher: {e}");
               break 'watch_loop;
