@@ -1,6 +1,6 @@
 //! 读取文件，支持从头部开始读，也支持从尾部向头部读，并持续追踪最新的内容
 
-use crate::file::{NewLine, watcher::{Watcher, MetadataEvent}};
+use crate::file::{Event, watcher::{Watcher, MetadataEvent}};
 use std::{
     io::SeekFrom,
     os::fd::{RawFd},
@@ -52,25 +52,21 @@ pub struct State {
     file: Option<File>,
 
     // 发送行的通道
-    tx: Option<mpsc::Sender<NewLine>>,
+    tx: Option<mpsc::Sender<Event>>,
 }
 
 impl State {
-    pub async fn new(path: &Path, fd: RawFd, buffer_size: u64, tx: mpsc::Sender<NewLine>) -> Result<Self> {
+    pub async fn new_head(path: &Path, fd: RawFd, buffer_size: u64, tx: mpsc::Sender<Event>) -> Result<Self> {
         // 基于给定的 fd 打开文件，这是 FileReader 先打开、并且一直持有的 fd，无论向前、向后读取，都使用该 fd，
         // 保证它们读到的同一份文件
         let fd_path = PathBuf::from(format!("/proc/self/fd/{}", fd));
 
         // 为本监控打开专用的文件流
-        let mut file = File::open(&fd_path).await?;
-        let metadata = file.metadata().await?;
+        let file = File::open(&fd_path).await?;
 
-        // 从尾部往前跳一段距离，我们从这里开始向前、向后读取
-        let last_position = metadata.len().saturating_sub(buffer_size);
-        file.seek(SeekFrom::Start(last_position)).await?;
-
+        // 返回处于头部的状态数据
         Ok(Self {
-            last_position,
+            last_position: 0,
             partial_buffer: Vec::with_capacity(buffer_size as usize),
             raw_path: path.into(),
             fd_path,
@@ -78,10 +74,29 @@ impl State {
             tx: Some(tx),
         })
     }
+
+    pub async fn new_tail(path: &Path, fd: RawFd, buffer_size: u64, tx: mpsc::Sender<Event>) -> Result<Self> {
+        let mut new_state = Self::new_head(path, fd, buffer_size, tx).await?;
+
+        // 从尾部往前跳一段距离，我们从这里开始向前、向后读取
+        if let Some(file) = &mut new_state.file {
+            let metadata = file.metadata().await?;
+            let last_position = metadata.len().saturating_sub(buffer_size);
+            file.seek(SeekFrom::Start(last_position)).await?;
+        }
+
+        // 返回已经处于尾部的状态数据
+        Ok(new_state)
+    }
     
     /// 当前是否已经读取到了头部
     pub fn has_reached_head(&self) -> bool {
         self.last_position == 0
+    }
+    
+    /// 返回当前文件的位置
+    pub fn position(&self) -> u64 {
+        self.last_position
     }
 
     /// 追加新内容到暂存区的头部，过长的部分将被截断
@@ -111,7 +126,7 @@ impl State {
 
     pub async fn send_head_for(&self, buffer: &[u8]) -> Result<()> {
         if let Some(tx) = &self.tx {
-            NewLine::send_head(tx, buffer).await?;
+            Event::send_head(tx, buffer).await?;
         }
 
         Ok(())
@@ -125,7 +140,7 @@ impl State {
 
     pub async fn send_tail_for(&self, buffer: &[u8]) -> Result<()> {
         if let Some(tx) = &self.tx {
-            NewLine::send_tail(tx, buffer).await?;
+            Event::send_tail(tx, buffer).await?;
         }
 
         Ok(())
@@ -142,13 +157,6 @@ pub struct BufferParts<'a> {
     pub middle: Vec<&'a [u8]>,
     pub tail: Option<&'a [u8]>,
     pub tail_is_end: bool,
-}
-
-/// 定义读取器事件
-pub enum Event {
-    Content(NewLine),
-    Renamed(PathBuf),
-    Removed,
 }
 
 /// 文件读取内容的方向
@@ -169,7 +177,7 @@ pub trait Reader: Sized {
     async fn stop(&mut self) -> Result<()>;
 
     /// 获取新的事件，包括新行添加、文件重命名，以及文件删除
-    async fn changed(&mut self) -> Result<Event>;
+    async fn changed(&mut self) -> Option<Event>;
 
     /// 往头部方向读取新的内容，将完整的行发送出去
     async fn read_head_lines(buffer: &mut Vec<u8>, state: &mut State) -> Result<()> {
@@ -271,7 +279,7 @@ pub trait Reader: Sized {
                 file.seek(SeekFrom::Current(-(bytes_read as i64))).await?;
             }
             ReadDirection::Tail => {
-                // 更新尾部方向的位置其实没有意义
+                // 更新尾部方向的位置。如果前后两次读取位置没变化，可以得知已经读取不到内容
                 state.last_position += bytes_read as u64;
             }
         }

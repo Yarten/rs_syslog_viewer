@@ -10,11 +10,12 @@ use std::{
 };
 use tokio::{
     io::{self},
-    sync::watch,
+    sync::{watch, mpsc},
     task::JoinHandle,
 };
 use tokio_util::sync::CancellationToken;
 use anyhow::{anyhow, Result};
+use crate::file::Event;
 
 #[derive(Debug, Default)]
 pub enum MetadataEvent {
@@ -27,6 +28,30 @@ pub enum MetadataEvent {
 
     /// 删除事件
     Removed,
+}
+
+impl MetadataEvent {
+    /// 将自己转化为 reader::Event 发送出去，
+    /// 返回是否中断轮询
+    pub async fn send(self, tx: &mpsc::Sender<Event>) -> bool {
+        match self {
+            MetadataEvent::Any => { false }
+            MetadataEvent::Renamed(new_path) => {
+                if let Err(e) = tx.send(Event::Renamed(new_path)).await {
+                    eprintln!("Failed to send renamed event: {e}");
+                    true
+                } else {
+                    false
+                }
+            }
+            MetadataEvent::Removed => {
+                if let Err(e) = tx.send(Event::Removed).await {
+                    eprintln!("Failed to send removed event: {e}");
+                }
+                true
+            }
+        }
+    }
 }
 
 pub enum ChangedEvent {

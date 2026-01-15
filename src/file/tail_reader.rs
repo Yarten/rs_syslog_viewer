@@ -2,7 +2,7 @@
 //! 持续监听新行的增加，往尾部发送新行。
 
 use crate::file::{
-    NewLine, Reader,
+    Event, Reader,
     reader::{Config, ReadDirection, State},
     watcher::{MetadataEvent, ChangedEvent},
 };
@@ -17,7 +17,6 @@ use tokio::{
     task::JoinHandle,
 };
 use tokio_util::sync::CancellationToken;
-use crate::file::reader::Event;
 
 /// 从尾部开始读取内容的文件读取器
 pub struct TailReader {
@@ -35,8 +34,9 @@ pub struct TailReader {
     /// 用于控制读取取消的 token
     cancel_token: CancellationToken,
 
-    /// 用于接收新行的通道
-    rx: mpsc::Receiver<NewLine>,
+    /// 用于收发事件的通道
+    tx: mpsc::Sender<Event>,
+    rx: mpsc::Receiver<Event>,
 
     /// 向前读取的 join handler
     jh_reading_head: Option<JoinHandle<()>>,
@@ -53,11 +53,11 @@ impl Reader for TailReader {
         let fd = file.as_raw_fd();
 
         // 创建通信通道
-        let (tx, rx) = mpsc::channel::<NewLine>(config.channel_size);
+        let (tx, rx) = mpsc::channel::<Event>(config.channel_size);
 
         // 初始化用于读取的状态
-        let head_state = State::new(path, fd, config.buffer_size, tx.clone()).await?;
-        let tail_state = State::new(path, fd, config.buffer_size, tx.clone()).await?;
+        let head_state = State::new_tail(path, fd, config.buffer_size, tx.clone()).await?;
+        let tail_state = State::new_tail(path, fd, config.buffer_size, tx.clone()).await?;
 
         // 返回文件读取器
         Ok(TailReader {
@@ -66,24 +66,39 @@ impl Reader for TailReader {
             head_state,
             tail_state,
             cancel_token: CancellationToken::new(),
+            tx,
             rx,
             jh_reading_head: None,
             jh_reading_tail: None,
-            metadata_channel: MetadataEventChannel::new(),
         })
     }
 
     async fn start(&mut self) -> Result<()> {
-        todo!()
+        // 初始化读取尾部一些内容
+        self.init_read().await?;
+
+        // 开始往头部方向读取
+        self.jh_reading_head = Some(self.spawn_reading_head());
+
+        // 开始往尾部方向读取
+        self.jh_reading_tail = Some(self.spawn_watching_change());
+
+        Ok(())
     }
 
     async fn stop(&mut self) -> Result<()> {
-        todo!()
+        self.cancel_token.cancel();
+        if let Some(jh) = self.jh_reading_head.take() {
+            jh.await?;
+        }
+        if let Some(jt) = self.jh_reading_tail.take() {
+            jt.await?;
+        }
+        Ok(())
     }
 
-    async fn changed(&mut self) -> Result<Event> {
-
-        todo!()
+    async fn changed(&mut self) -> Option<Event> {
+        self.rx.recv().await
     }
 }
 
@@ -158,6 +173,9 @@ impl TailReader {
         // 导出 config
         let config = self.config.clone();
 
+        // 取出事件发送通道，用于发送 metadata 变化事件
+        let tx = self.tx.clone();
+
         // 启动新协程，监控文件变化
         tokio::spawn(async move {
             // 创建文件系统监视器
@@ -178,20 +196,28 @@ impl TailReader {
                     // 外部的取消信号
                     _ = cancel_token.cancelled() => { break 'watch_loop; },
 
-                    // 监控文件内容的变化
-                    res = watcher.content_changed() => {
-                        if let Err(_) = res {
+                    // 监控文件变化
+                    res = watcher.changed() => {
+                        if let Err(e) = res {
+                            eprintln!("Failed to watch watcher: {e}");
                             break 'watch_loop;
                         }
-                        if let Err(e) = Self::read_tail_lines(&mut buffer, &mut state).await {
-                            eprintln!("Error while reading tail lines: {e}");
-                            break 'watch_loop;
+                        match res.unwrap() {
+                            // 文件元数据变更，可能是重命名或者被删除。如果被删除，则结束监听
+                            ChangedEvent::Metadata(event) => {
+                                if (event.send(&tx).await) {
+                                    break 'watch_loop;
+                                }
+                            }
+
+                            // 文件变更，对于我们从尾部读取的情况来说，就是尾部新增了内容
+                            ChangedEvent::Content => {
+                                if let Err(e) = Self::read_tail_lines(&mut buffer, &mut state).await {
+                                    eprintln!("Error while reading tail lines: {e}");
+                                    break 'watch_loop;
+                                }
+                            }
                         }
-                    }
-
-                    // 监听文件路径的变化，如果被删除，则停止监听
-                    metadata_event = watcher.metadata_changed() => {
-
                     }
                 }
             }
