@@ -91,20 +91,20 @@ impl HeadReader {
     Ok(tokio::spawn(async move {
       'watch_loop: loop {
         tokio::select! {
-            // 外部的取消信号
-            _ = cancel_token.cancelled() => { break 'watch_loop; },
+          // 外部的取消信号
+          _ = cancel_token.cancelled() => { break 'watch_loop; },
 
-            // 监控文件的路径变化
-            res = watcher.changed() => {
-                if let Err(e) = res {
-                    eprintln!("watcher error: {:?}", e);
-                    break 'watch_loop;
-                } else if let Ok(ChangedEvent::Metadata(event)) = res {
-                    if (event.send(&tx).await) {
-                        break 'watch_loop;
-                    }
-                }
+          // 监控文件的路径变化
+          res = watcher.changed() => {
+            if let Err(e) = res {
+              eprintln!("watcher error: {:?}", e);
+              break 'watch_loop;
+            } else if let Ok(ChangedEvent::Metadata(event)) = res {
+              if (event.send(&tx).await) {
+                  break 'watch_loop;
+              }
             }
+          }
         }
       }
     }))

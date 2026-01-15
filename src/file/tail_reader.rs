@@ -186,32 +186,32 @@ impl TailReader {
       // 循环监听
       'watch_loop: loop {
         tokio::select! {
-            // 外部的取消信号
-            _ = cancel_token.cancelled() => { break 'watch_loop; },
+          // 外部的取消信号
+          _ = cancel_token.cancelled() => { break 'watch_loop; },
 
-            // 监控文件变化
-            res = watcher.changed() => {
-                if let Err(e) = res {
-                    eprintln!("Failed to watch watcher: {e}");
-                    break 'watch_loop;
+          // 监控文件变化
+          res = watcher.changed() => match res {
+            Ok(event) => match event {
+              // 文件元数据变更，可能是重命名或者被删除。如果被删除，则结束监听
+              ChangedEvent::Metadata(event) => {
+                if (event.send(&tx).await) {
+                  break 'watch_loop;
                 }
-                match res.unwrap() {
-                    // 文件元数据变更，可能是重命名或者被删除。如果被删除，则结束监听
-                    ChangedEvent::Metadata(event) => {
-                        if (event.send(&tx).await) {
-                            break 'watch_loop;
-                        }
-                    }
+              }
 
-                    // 文件变更，对于我们从尾部读取的情况来说，就是尾部新增了内容
-                    ChangedEvent::Content => {
-                        if let Err(e) = Self::read_tail_lines(&mut buffer, &mut state).await {
-                            eprintln!("Error while reading tail lines: {e}");
-                            break 'watch_loop;
-                        }
-                    }
+              // 文件变更，对于我们从尾部读取的情况来说，就是尾部新增了内容
+              ChangedEvent::Content => {
+                if let Err(e) = Self::read_tail_lines(&mut buffer, &mut state).await {
+                  eprintln!("Error while reading tail lines: {e}");
+                  break 'watch_loop;
                 }
+              }
             }
+            Err(e) => {
+              eprintln!("Failed to watch watcher: {e}");
+              break 'watch_loop;
+            }
+          }
         }
       }
     })

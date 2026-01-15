@@ -142,44 +142,43 @@ impl Watcher {
   pub async fn changed(&mut self) -> Result<ChangedEvent> {
     loop {
       tokio::select! {
-          // 监控文件内容的变化，来自 notify
-          res = self.content_event_rx.changed() => {
-              res?;
+        // 监控文件内容的变化，来自 notify
+        res = self.content_event_rx.changed() => {
+          res?;
 
-              let event;
-              match &*self.content_event_rx.borrow_and_update() {
-                  Ok(event_ref) => {
-                      event = event_ref.clone();
-                  },
-                  Err(e) => {
-                      eprintln!("Error when reading notify event {} of file {}", e, self.raw_path.to_str().unwrap_or(""));
-                      return Err(anyhow!(e.to_string()));
-                  }
-              }
+          let event;
+          match &*self.content_event_rx.borrow_and_update() {
+            Ok(event_ref) => {
+              event = event_ref.clone();
+            },
+            Err(e) => {
+              eprintln!("Error when reading notify event {} of file {}", e, self.raw_path.to_str().unwrap_or(""));
+              return Err(anyhow!(e.to_string()));
+            }
+        }
 
-              if let EventKind::Modify(_) | EventKind::Access(AccessKind::Close(AccessMode::Write)) = event.kind {
-                  return Ok(ChangedEvent::Content);
-              } else {
-                  continue;
-              }
-
-          },
-
-          // 监控路径名称的变化，来自本类的异步轮询流程
-          res = self.metadata_event_rx.changed() => {
-              res?;
-              match &*self.metadata_event_rx.borrow_and_update() {
-                  MetadataEvent::Any => {
-                      continue;
-                  },
-                  MetadataEvent::Renamed(new_path) => {
-                      return Ok(ChangedEvent::Metadata(MetadataEvent::Renamed(new_path.clone())));
-                  },
-                  MetadataEvent::Removed => {
-                      return Ok(ChangedEvent::Metadata(MetadataEvent::Removed));
-                  }
-              }
+          if let EventKind::Modify(_) | EventKind::Access(AccessKind::Close(AccessMode::Write)) = event.kind {
+            return Ok(ChangedEvent::Content);
+          } else {
+            continue;
           }
+        },
+
+        // 监控路径名称的变化，来自本类的异步轮询流程
+        res = self.metadata_event_rx.changed() => {
+          res?;
+          match &*self.metadata_event_rx.borrow_and_update() {
+            MetadataEvent::Any => {
+              continue;
+            },
+            MetadataEvent::Renamed(new_path) => {
+              return Ok(ChangedEvent::Metadata(MetadataEvent::Renamed(new_path.clone())));
+            },
+            MetadataEvent::Removed => {
+              return Ok(ChangedEvent::Metadata(MetadataEvent::Removed));
+            }
+          }
+        }
       }
     }
   }
@@ -194,33 +193,33 @@ impl Watcher {
     tokio::spawn(async move {
       loop {
         tokio::select! {
-            _ = cancel_token.cancelled() => break,
-            _ = tokio::time::sleep(poll_interval) => {
-                match fd_path.read_link() {
-                    Ok(link) => {
-                        // 轮询检查 fd 路径指向的真实路径内容是否发生变化
-                        if link == raw_path {
-                            continue;
-                        }
-
-                        // 检查路径末尾是否有被删除的标记，有说明文件被删除，发送删除事件并结束轮询
-                        if link.ends_with("(deleted)") {
-                            let _ = tx.send(MetadataEvent::Removed);
-                            break;
-                        }
-
-                        // 名称如果变化，发送重命名事件，并等待进行下一次轮询
-                        raw_path = link;
-                        let _ = tx.send(MetadataEvent::Renamed(raw_path.clone()));
-                    },
-                    Err(e) => {
-                        // 如果报错，我们也认为该文件被删除，发送删除事件并结束轮询
-                        eprintln!("{} read link failed: {}", fd_path.to_str().unwrap_or(""), e);
-                        let _ = tx.send(MetadataEvent::Removed);
-                        break;
-                    }
+          _ = cancel_token.cancelled() => break,
+          _ = tokio::time::sleep(poll_interval) => {
+            match fd_path.read_link() {
+              Ok(link) => {
+                // 轮询检查 fd 路径指向的真实路径内容是否发生变化
+                if link == raw_path {
+                  continue;
                 }
-            },
+
+                // 检查路径末尾是否有被删除的标记，有说明文件被删除，发送删除事件并结束轮询
+                if link.ends_with("(deleted)") {
+                  let _ = tx.send(MetadataEvent::Removed);
+                  break;
+                }
+
+                // 名称如果变化，发送重命名事件，并等待进行下一次轮询
+                raw_path = link;
+                let _ = tx.send(MetadataEvent::Renamed(raw_path.clone()));
+              },
+              Err(e) => {
+                // 如果报错，我们也认为该文件被删除，发送删除事件并结束轮询
+                eprintln!("{} read link failed: {}", fd_path.to_str().unwrap_or(""), e);
+                let _ = tx.send(MetadataEvent::Removed);
+                break;
+              }
+            }
+          },
         }
       }
     })
