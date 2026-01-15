@@ -4,33 +4,30 @@
 //! 3. 文件的删除。
 
 use std::path::PathBuf;
-use tokio::{
-    sync::{mpsc},
-    io::{Result},
-};
+use tokio::{io::Result, sync::mpsc};
 
 #[derive(Debug)]
 pub enum Event {
-    NewHead(String),
-    NewTail(String),
-    Renamed(PathBuf),
-    Removed,
+  NewHead(String),
+  NewTail(String),
+  Renamed(PathBuf),
+  Removed,
 }
 
 impl Event {
-    pub async fn send_head(tx: &mpsc::Sender<Event>, buffer: &[u8]) -> Result<()> {
-        let line = Event::NewHead(String::from_utf8_lossy(buffer).to_string());
-        if let Err(e) = tx.send(line).await {
-            eprintln!("Failed to send head line: {}", e);
-        }
-        Ok(())
+  pub async fn send_head(tx: &mpsc::Sender<Event>, buffer: &[u8]) -> Result<()> {
+    let line = Event::NewHead(String::from_utf8_lossy(buffer).to_string());
+    if let Err(e) = tx.send(line).await {
+      eprintln!("Failed to send head line: {}", e);
     }
+    Ok(())
+  }
 
-    pub async fn send_tail(tx: &mpsc::Sender<Event>, buffer: &[u8]) -> Result<()> {
-        let line = Event::NewTail(String::from_utf8_lossy(buffer).to_string());
-        if let Err(e) = tx.send(line).await {
-            eprintln!("Failed to send tail line: {}", e);
-        }
-        Ok(())
+  pub async fn send_tail(tx: &mpsc::Sender<Event>, buffer: &[u8]) -> Result<()> {
+    let line = Event::NewTail(String::from_utf8_lossy(buffer).to_string());
+    if let Err(e) = tx.send(line).await {
+      eprintln!("Failed to send tail line: {}", e);
     }
+    Ok(())
+  }
 }
