@@ -1,6 +1,6 @@
 mod event;
 mod head_reader;
-mod reader;
+pub mod reader;
 mod tail_reader;
 mod watcher;
 

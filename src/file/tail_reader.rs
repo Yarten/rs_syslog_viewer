@@ -197,7 +197,7 @@ impl TailReader {
                 break 'watch_loop;
               }
             },
-            
+
             // 文件变更，对于我们从尾部读取的情况来说，就是尾部新增了内容
             Ok(ChangedEvent::Content) => {
               if let Err(e) = Self::read_tail_lines(&mut buffer, &mut state).await {
@@ -205,7 +205,7 @@ impl TailReader {
                 break 'watch_loop;
               }
             },
-            
+
             // 出现错误则报错退出
             Err(e) => {
               eprintln!("Failed to watch watcher: {e}");

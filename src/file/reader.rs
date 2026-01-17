@@ -93,8 +93,8 @@ impl State {
     // 从尾部往前跳一段距离，我们从这里开始向前、向后读取
     if let Some(file) = &mut new_state.file {
       let metadata = file.metadata().await?;
-      let last_position = metadata.len().saturating_sub(buffer_size);
-      file.seek(SeekFrom::Start(last_position)).await?;
+      new_state.last_position = metadata.len().saturating_sub(buffer_size);
+      file.seek(SeekFrom::Start(new_state.last_position)).await?;
     }
 
     // 返回已经处于尾部的状态数据
