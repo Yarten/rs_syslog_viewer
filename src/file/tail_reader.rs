@@ -214,6 +214,9 @@ impl TailReader {
           }
         }
       }
+
+      // 确保向前读取内容的流程也停止
+      cancel_token.cancel();
     })
   }
 }

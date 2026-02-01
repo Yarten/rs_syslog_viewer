@@ -1,9 +1,6 @@
+use rs_syslog_viewer::file::{Event, HeadReader, Reader, TailReader, reader::Config};
 use std::collections::LinkedList;
 use std::path::Path;
-use rs_syslog_viewer::file::{
-  Reader, TailReader, HeadReader, Event,
-  reader::{Config}
-};
 
 mod common;
 
@@ -11,15 +8,11 @@ async fn read_file<R>(path: &Path, true_content: &LinkedList<String>)
 where
   R: Reader,
 {
-  let mut reader =
-    R::open(path, Config::default())
-      .await
-      .expect("Failed to create reader");
-
-  reader
-    .start()
+  let mut reader = R::open(path, Config::default())
     .await
-    .expect("Failed to start reader");
+    .expect("Failed to create reader");
+
+  reader.start().await.expect("Failed to start reader");
 
   let mut content = LinkedList::new();
   loop {
@@ -44,10 +37,7 @@ where
     }
   }
 
-  reader
-    .stop()
-    .await
-    .expect("Failed to stop reader");
+  reader.stop().await.expect("Failed to stop reader");
 
   assert_eq!(&content, true_content);
 }
