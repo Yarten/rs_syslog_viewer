@@ -1,9 +1,5 @@
-use crate::file::{
-  Event,
-};
-use crate::log::{
-  LogFileContent,
-};
+use crate::file::Event;
+use crate::log::LogFileContent;
 
 #[derive(Default)]
 pub struct LogFile {
@@ -11,9 +7,7 @@ pub struct LogFile {
 }
 
 impl LogFile {
-  fn test() {
-
-  }
+  fn test() {}
 }
 
 #[cfg(test)]

@@ -239,14 +239,21 @@ mod tests {
     let tag = "gnome-shell";
     let pid = 3208;
     let content = "Can't update stage views actor <unnamed>[<MetaSurfaceActorX11>:0x572a8221c360] is on because it needs an allocation.";
-    let log = LogLine::new(format!("{timestamp} yarten-Dell-G16-7630 {tag}[{pid}]: {content}"));
+    let log = LogLine::new(format!(
+      "{timestamp} yarten-Dell-G16-7630 {tag}[{pid}]: {content}"
+    ));
 
     let log = match log {
-      LogLine::Good(log) => {log}
-      LogLine::Bad(_) => { panic!("bad log line") }
+      LogLine::Good(log) => log,
+      LogLine::Bad(_) => {
+        panic!("bad log line")
+      }
     };
 
-    assert_eq!(log.timestamp, DateTime::parse_from_rfc3339(timestamp).unwrap());
+    assert_eq!(
+      log.timestamp,
+      DateTime::parse_from_rfc3339(timestamp).unwrap()
+    );
     assert_eq!(log.tag, tag);
     assert_eq!(log.pid, pid);
     assert_eq!(log.message, content);
@@ -258,11 +265,15 @@ mod tests {
     let tag = "gnome-shell";
     let pid = 3203;
     let content = "Can't update stage views actor <unnamed>[<MetaSurfaceActorX11>:0x6178166954e0] is on because it needs an allocation.";
-    let log = LogLine::new(format!("{timestamp} yarten-Dell-G16-7630 {tag}[{pid}]: {content}"));
+    let log = LogLine::new(format!(
+      "{timestamp} yarten-Dell-G16-7630 {tag}[{pid}]: {content}"
+    ));
 
     let log = match log {
-      LogLine::Good(log) => {log}
-      LogLine::Bad(_) => { panic!("bad log line") }
+      LogLine::Good(log) => log,
+      LogLine::Bad(_) => {
+        panic!("bad log line")
+      }
     };
 
     assert_eq!(log.tag, tag);
