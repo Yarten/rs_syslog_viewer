@@ -222,12 +222,25 @@ impl LogFileContent {
     }
   }
 
-  fn iter_forward(&'_ self, index: Index) -> ForwardIter<'_> {
+  pub fn iter_forward_from(&'_ self, index: Index) -> ForwardIter<'_> {
     ForwardIter { index, data: &self }
   }
 
-  fn iter_backward(&'_ self, index: Index) -> BackwardIter<'_> {
+  pub fn iter_backward_from(&'_ self, index: Index) -> BackwardIter<'_> {
     BackwardIter { index, data: &self }
+  }
+
+  pub fn iter_forward_from_head(&'_ self) -> ForwardIter<'_> {
+    self.iter_forward_from(Index::new(0, 0))
+  }
+
+  pub fn iter_backward_from_tail(&'_ self) -> BackwardIter<'_> {
+    let chunk_index = self.chunks.len().saturating_sub(1);
+    let line_index = match self.chunks.get(chunk_index) {
+      None => 0,
+      Some(chunk) => chunk.len().saturating_sub(1),
+    };
+    self.iter_backward_from(Index::new(chunk_index, line_index))
   }
 }
 
@@ -238,7 +251,7 @@ impl Default for LogFileContent {
   }
 }
 
-struct ForwardIter<'a> {
+pub struct ForwardIter<'a> {
   index: Index,
   data: &'a LogFileContent,
 }
@@ -265,7 +278,7 @@ impl<'a> Iterator for ForwardIter<'a> {
   }
 }
 
-struct BackwardIter<'a> {
+pub struct BackwardIter<'a> {
   index: Index,
   data: &'a LogFileContent,
 }
@@ -417,7 +430,7 @@ mod tests {
     );
     assert_eq!(iter.next_back(), None);
 
-    let mut iter = content.iter_forward(Index::new(0, 1));
+    let mut iter = content.iter_forward_from(Index::new(0, 1));
     assert_eq!(
       iter.next(),
       Some((Index::new(0, 1), &LogLine::new("222".to_string())))
@@ -432,7 +445,45 @@ mod tests {
     );
     assert_eq!(iter.next(), None);
 
-    let mut iter = content.iter_backward(Index::new(1, 0));
+    let mut iter = content.iter_backward_from(Index::new(1, 0));
+    assert_eq!(
+      iter.next(),
+      Some((Index::new(1, 0), &LogLine::new("aaa".to_string())))
+    );
+    assert_eq!(
+      iter.next(),
+      Some((Index::new(0, 1), &LogLine::new("222".to_string())))
+    );
+    assert_eq!(
+      iter.next(),
+      Some((Index::new(0, 0), &LogLine::new("111".to_string())))
+    );
+    assert_eq!(iter.next(), None);
+
+    let mut iter = content.iter_forward_from_head();
+    assert_eq!(
+      iter.next(),
+      Some((Index::new(0, 0), &LogLine::new("111".to_string())))
+    );
+    assert_eq!(
+      iter.next(),
+      Some((Index::new(0, 1), &LogLine::new("222".to_string())))
+    );
+    assert_eq!(
+      iter.next(),
+      Some((Index::new(1, 0), &LogLine::new("aaa".to_string())))
+    );
+    assert_eq!(
+      iter.next(),
+      Some((Index::new(1, 1), &LogLine::new("bbb".to_string())))
+    );
+    assert_eq!(iter.next(), None);
+
+    let mut iter = content.iter_backward_from_tail();
+    assert_eq!(
+      iter.next(),
+      Some((Index::new(1, 1), &LogLine::new("bbb".to_string())))
+    );
     assert_eq!(
       iter.next(),
       Some((Index::new(1, 0), &LogLine::new("aaa".to_string())))

@@ -3,7 +3,7 @@
 
 use crate::file::{
   Event, Reader,
-  reader::{Config, ReadDirection, State},
+  reader::{self, Config, ReadDirection, ReaderBase, State},
   watcher::{ChangedEvent, MetadataEvent},
 };
 use anyhow::Result;
@@ -65,7 +65,9 @@ impl Reader for TailReader {
       jh_reading_tail: None,
     })
   }
+}
 
+impl ReaderBase for TailReader {
   async fn start(&mut self) -> Result<()> {
     // 初始化读取尾部一些内容
     self.init_read().await?;
@@ -105,11 +107,11 @@ impl TailReader {
     // 这里将分成三个部分，头部属于 head state 的一部分，中间可以发送追加，尾部属于 tail state 的一部分。
     // head state 和 tail state 的一部分，将在未来向前、向后读取新内容时，和新内容拼接在一起
     if let Some(parts) =
-      Self::read_buffer(&mut buffer, &mut self.tail_state, ReadDirection::Tail).await?
+      reader::read_buffer(&mut buffer, &mut self.tail_state, ReadDirection::Tail).await?
     {
       if let Some(tail_part) = parts.tail {
         // 处理头部
-        Self::update_head_line(&mut self.head_state, parts.head).await?;
+        reader::update_head_line(&mut self.head_state, parts.head).await?;
 
         // 中间部分，都是完整行，我们将其发射出去
         for line_buffer in parts.middle {
@@ -117,12 +119,12 @@ impl TailReader {
         }
 
         // 处理尾部
-        Self::update_tail_line(&mut self.tail_state, tail_part, parts.tail_is_end).await?;
+        reader::update_tail_line(&mut self.tail_state, tail_part, parts.tail_is_end).await?;
       } else {
         // 尾部不存在，说明我们只读到一行。
         // 如果已经到达头部首字符，那么说明这个行是完整的；否则，这个行不完整，加入头部方向搜索。
         // 我们不考虑它也是尾行，且尾行也不完整的情况，此处只能截断处理。
-        Self::update_head_line(&mut self.head_state, parts.head).await?;
+        reader::update_head_line(&mut self.head_state, parts.head).await?;
       }
     }
 
@@ -147,7 +149,7 @@ impl TailReader {
 
       // 一直读取，直至到达文件头部
       while !state.has_reached_head() && !cancel_token.is_cancelled() {
-        if let Err(e) = Self::read_head_lines(&mut buffer, &mut state).await {
+        if let Err(e) = reader::read_head_lines(&mut buffer, &mut state).await {
           eprintln!("Error while reading head lines: {e}");
           break;
         }
@@ -200,7 +202,7 @@ impl TailReader {
 
             // 文件变更，对于我们从尾部读取的情况来说，就是尾部新增了内容
             Ok(ChangedEvent::Content) => {
-              if let Err(e) = Self::read_tail_lines(&mut buffer, &mut state).await {
+              if let Err(e) = reader::read_tail_lines(&mut buffer, &mut state).await {
                 eprintln!("Error while reading tail lines: {e}");
                 break 'watch_loop;
               }

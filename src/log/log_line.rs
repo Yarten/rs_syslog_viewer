@@ -4,7 +4,7 @@ use chrono::{DateTime, Datelike, FixedOffset, Local, NaiveDateTime};
 use lazy_static::lazy_static;
 
 /// 日志内容标签
-#[derive(PartialEq, Debug)]
+#[derive(PartialEq, Debug, Clone)]
 pub enum Label {
   Unknown,
   Debug,
@@ -14,29 +14,29 @@ pub enum Label {
 }
 
 /// 来自 syslog 的日志行
-#[derive(PartialEq, Debug)]
+#[derive(PartialEq, Debug, Clone)]
 pub struct NormalLogLine {
   /// 日志的产生时间
-  timestamp: DateTime<FixedOffset>,
+  pub timestamp: DateTime<FixedOffset>,
 
   /// 日志的标签
-  tag: String,
+  pub tag: String,
 
   /// 产生的进程 PID，如果是 rsyslog 自己的日志，这个值为 0
-  pid: i32,
+  pub pid: i32,
 
   /// 内容
-  message: String,
+  pub message: String,
 
   /// 内容里若包含特定的字样，会被贴上相关标签，只能贴第一个相关的
-  label: Label,
+  pub label: Label,
 
   /// 标记该日志是否被 marked，用于 viewer 快速定位
-  marked: bool,
+  pub marked: bool,
 }
 
 /// 无法解析的日志行
-#[derive(PartialEq, Debug)]
+#[derive(PartialEq, Debug, Clone)]
 pub struct BrokenLogLine {
   /// 内容
   content: String,
@@ -64,7 +64,7 @@ lazy_static! {
 }
 
 /// 日志行
-#[derive(PartialEq, Debug)]
+#[derive(PartialEq, Debug, Clone)]
 pub enum LogLine {
   Good(NormalLogLine),
   Bad(BrokenLogLine),

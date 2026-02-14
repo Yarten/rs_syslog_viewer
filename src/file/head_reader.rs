@@ -2,6 +2,7 @@
 
 use crate::file::{
   Event, Reader,
+  reader::{self, ReaderBase},
   reader::{Config, State},
   watcher::{ChangedEvent, MetadataEvent},
 };
@@ -59,7 +60,9 @@ impl Reader for HeadReader {
       jh_reading: None,
     })
   }
+}
 
+impl ReaderBase for HeadReader {
   async fn start(&mut self) -> Result<()> {
     self.jh_watching = Some(self.spawn_watching()?);
     self.jh_reading = Some(self.spawn_reading());
@@ -142,7 +145,7 @@ impl HeadReader {
         // 记录上一次读取的位置
         let last_position = state.position();
 
-        if let Err(e) = Self::read_tail_lines(&mut buffer, &mut state).await {
+        if let Err(e) = reader::read_tail_lines(&mut buffer, &mut state).await {
           eprintln!("Error while reading tail lines: {e}");
           break;
         }

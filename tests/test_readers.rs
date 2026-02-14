@@ -4,7 +4,7 @@ use std::path::Path;
 
 mod common;
 
-async fn read_file<R>(path: &Path, true_content: &LinkedList<String>)
+async fn read_file<R>(path: &Path, true_content: &Vec<String>)
 where
   R: Reader,
 {
@@ -37,13 +37,15 @@ where
     }
   }
 
+  let content: Vec<String> = content.into_iter().collect();
+
   reader.stop().await.expect("Failed to stop reader");
 
   assert_eq!(&content, true_content);
 }
 
 #[tokio::test]
-async fn readers_test() {
+async fn test_readers() {
   let log_path = common::get_test_log();
   let true_content = common::read_file_as_lines(&log_path);
   println!("Test tail reader ...");

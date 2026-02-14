@@ -1,23 +1,131 @@
-use crate::file::Event;
-use crate::log::LogFileContent;
+use super::log_file_content::{BackwardIter, ForwardIter, Index, LogFileContent};
+use crate::file::{
+  Event, HeadReader, TailReader,
+  reader::{self, Reader, ReaderBase},
+};
+use crate::log::{Event as LogEvent, LogLine};
+use anyhow::Result;
+use enum_dispatch::enum_dispatch;
+use std::collections::HashSet;
+use std::path::{Path, PathBuf};
+use tokio::{select, time::Duration};
 
-#[derive(Default)]
+/// 不同类型的 reader
+#[enum_dispatch(ReaderBase)]
+enum AnyReader {
+  Head(HeadReader),
+  Tail(TailReader),
+}
+
+/// 维护一份日志文件的内容读取、名称变更与删除，同时提供一些只读查询接口
 pub struct LogFile {
+  /// 日志的文件路径
+  path: PathBuf,
+
+  /// 日志内容
   content: LogFileContent,
+
+  /// 文件内容读取器
+  reader: AnyReader,
+
+  /// 持续收集的日志标签，用于检查是否有新的，如果出现新的，向上一层报告
+  tags: HashSet<String>,
 }
 
 impl LogFile {
-  fn test() {}
+  /// 打开指定文件，并开始异步读取内容，监听它的变化。
+  ///
+  /// 使用 `latest` 参数指明该文件是否是最新的、正在被系统更新的文件，是我们将持续追踪它的最新内容,
+  /// 否则一次性读完内容后，就会自动结束异步读取流程。
+  ///
+  /// `tags` 参数是之前历史上已经查询出来的一些标签记录，在打开新日志时，它可以用于去重。
+  pub async fn open(path: PathBuf, latest: bool, tags: HashSet<String>) -> Result<LogFile> {
+    let config = reader::Config::default();
+    let mut reader = if latest {
+      AnyReader::Tail(TailReader::open(&path, config).await?)
+    } else {
+      AnyReader::Head(HeadReader::open(&path, config).await?)
+    };
+
+    reader.start().await?;
+
+    Ok(LogFile {
+      path,
+      content: LogFileContent::default(),
+      reader,
+      tags,
+    })
+  }
+
+  /// 处理一次文件内容的变更检查与处理
+  pub async fn update(&mut self) -> Option<LogEvent> {
+    if let Some(event) = self.reader.changed().await {
+      match event {
+        Event::NewHead(s) => {
+          let new_log = LogLine::new(s);
+          let new_tag = self.update_tag(&new_log);
+          self.content.push_front(new_log);
+          new_tag
+        }
+        Event::NewTail(s) => {
+          let new_log = LogLine::new(s);
+          let new_tag = self.update_tag(&new_log);
+          self.content.push_back(new_log);
+          new_tag
+        }
+        Event::Renamed(new_path) => {
+          self.path = new_path;
+          Some(LogEvent::Tick)
+        }
+        Event::Removed => Some(LogEvent::Removed),
+      }
+    } else {
+      // 无法读到新的变更，代表本阅读器已经出错
+      None
+    }
+  }
+
+  /// 关闭本日志的异步监听流程
+  pub async fn close(&mut self) -> Result<()> {
+    Ok(self.reader.stop().await?)
+  }
+
+  pub fn iter_forward_from(&'_ self, index: Index) -> ForwardIter<'_> {
+    self.content.iter_forward_from(index)
+  }
+
+  pub fn iter_backward_from(&'_ self, index: Index) -> BackwardIter<'_> {
+    self.content.iter_backward_from(index)
+  }
+
+  pub fn iter_forward_from_head(&'_ self) -> ForwardIter<'_> {
+    self.content.iter_forward_from_head()
+  }
+
+  pub fn iter_backward_from_tail(&'_ self) -> BackwardIter<'_> {
+    self.content.iter_backward_from_tail()
+  }
+
+  /// 检查给定的新日志行，是否带来了新的、未知的日志标签
+  fn update_tag(&mut self, log: &LogLine) -> Option<LogEvent> {
+    match log {
+      LogLine::Good(log) => {
+        if self.tags.contains(&log.tag) {
+          Some(LogEvent::Tick)
+        } else {
+          self.tags.insert(log.tag.clone());
+          Some(LogEvent::NewTag(log.tag.clone()))
+        }
+      }
+      LogLine::Bad(_) => Some(LogEvent::Tick),
+    }
+  }
 }
 
 #[cfg(test)]
 mod tests {
+  use super::*;
+
   #[test]
-  fn test1() {
-    let x = vec![1; 5];
-    x.iter().next_back();
-    for (i, j) in x.iter().enumerate().nth(3) {
-      println!("x[{}] = {}", i, j);
-    }
-  }
+  fn test_log_file() {}
 }
