@@ -24,6 +24,7 @@ pub struct Config {
   pub buffer_size: u64,
   pub poll_interval: Duration,
   pub channel_size: usize,
+  pub recv_buffer_size: usize,
 }
 
 impl Default for Config {
@@ -32,6 +33,7 @@ impl Default for Config {
       buffer_size: 4096,
       poll_interval: Duration::from_millis(100),
       channel_size: 2000,
+      recv_buffer_size: 100,
     }
   }
 }
@@ -187,7 +189,7 @@ pub trait ReaderBase {
   async fn stop(&mut self) -> Result<()>;
 
   /// 获取新的事件，包括新行添加、文件重命名，以及文件删除
-  async fn changed(&mut self) -> Option<Event>;
+  async fn changed(&mut self) -> Option<Vec<Event>>;
 }
 
 /// 读取文件的接口定义
@@ -352,4 +354,15 @@ pub async fn update_tail_line(
   }
 
   Ok(())
+}
+
+/// 从一个事件接收通道中，尽可能取出多的事件
+pub async fn poll_events(rx: &mut mpsc::Receiver<Event>, buf_size: usize) -> Option<Vec<Event>> {
+  let mut buf = Vec::with_capacity(buf_size);
+  let count = rx.recv_many(&mut buf, buf_size).await;
+  if count == 0 {
+    None
+  } else {
+    Some(buf)
+  }
 }

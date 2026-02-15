@@ -3,12 +3,14 @@ use crate::file::{
   Event, HeadReader, TailReader,
   reader::{self, Reader, ReaderBase},
 };
-use crate::log::{Event as LogEvent, LogLine};
+use crate::log::{Event as LogEvent, LogLine, DataBoard};
 use anyhow::Result;
 use enum_dispatch::enum_dispatch;
-use std::collections::HashSet;
-use std::path::{Path, PathBuf};
-use tokio::{select, time::Duration};
+use std::{
+  collections::HashSet,
+  path::{Path, PathBuf},
+  sync::Arc,
+};
 
 /// 不同类型的 reader
 #[enum_dispatch(ReaderBase)]
@@ -27,9 +29,6 @@ pub struct LogFile {
 
   /// 文件内容读取器
   reader: AnyReader,
-
-  /// 持续收集的日志标签，用于检查是否有新的，如果出现新的，向上一层报告
-  tags: HashSet<String>,
 }
 
 impl LogFile {
@@ -39,7 +38,7 @@ impl LogFile {
   /// 否则一次性读完内容后，就会自动结束异步读取流程。
   ///
   /// `tags` 参数是之前历史上已经查询出来的一些标签记录，在打开新日志时，它可以用于去重。
-  pub async fn open(path: PathBuf, latest: bool, tags: HashSet<String>) -> Result<LogFile> {
+  pub async fn open(path: PathBuf, latest: bool) -> Result<LogFile> {
     let config = reader::Config::default();
     let mut reader = if latest {
       AnyReader::Tail(TailReader::open(&path, config).await?)
@@ -53,7 +52,6 @@ impl LogFile {
       path,
       content: LogFileContent::default(),
       reader,
-      tags,
     })
   }
 
@@ -61,27 +59,36 @@ impl LogFile {
   /// 
   /// # Cancel Safety
   /// 本函数保证，当 await 被取消时，没有副作用。
-  pub async fn update(&mut self) -> Option<LogEvent> {
-    if let Some(event) = self.reader.changed().await {
-      match event {
-        Event::NewHead(s) => {
-          let new_log = LogLine::new(s);
-          let new_tag = self.update_tag(&new_log);
-          self.content.push_front(new_log);
-          new_tag
-        }
-        Event::NewTail(s) => {
-          let new_log = LogLine::new(s);
-          let new_tag = self.update_tag(&new_log);
-          self.content.push_back(new_log);
-          new_tag
-        }
-        Event::Renamed(new_path) => {
-          self.path = new_path;
-          Some(LogEvent::Tick)
-        }
-        Event::Removed => Some(LogEvent::Removed),
-      }
+  pub async fn update(&mut self, data_board: Arc<DataBoard>) -> Option<Vec<LogEvent>> {
+    if let Some(events) = self.reader.changed().await {
+      // 处理多个日志底层事件，消化掉内容新增事件，并向数据看板更新可能的新增标签，
+      // 消化掉更名事件，
+      // 如果是删除事件，则直接向调用者透传。
+      events
+        .into_iter()
+        .filter_map(|event| {
+          match event {
+            Event::NewHead(s) => {
+              let new_log = LogLine::new(s);
+              self.update_tag(&new_log, &data_board);
+              self.content.push_front(new_log);
+              None
+            }
+            Event::NewTail(s) => {
+              let new_log = LogLine::new(s);
+              self.update_tag(&new_log, &data_board);
+              self.content.push_back(new_log);
+              None
+            }
+            Event::Renamed(new_path) => {
+              self.path = new_path;
+              None
+            }
+            Event::Removed => Some(LogEvent::Removed),
+          }
+        })
+        .collect::<Vec<LogEvent>>()
+        .into()
     } else {
       // 无法读到新的变更，代表本阅读器已经出错
       None
@@ -89,7 +96,7 @@ impl LogFile {
   }
 
   /// 关闭本日志的异步监听流程
-  /// 
+  ///
   /// # Cancel Safety
   /// 本函数保证 await 被终止时，没有副作用，异步的流程仍然会在后台完全结束。
   pub async fn close(&mut self) -> Result<()> {
@@ -125,17 +132,9 @@ impl LogFile {
   }
 
   /// 检查给定的新日志行，是否带来了新的、未知的日志标签
-  fn update_tag(&mut self, log: &LogLine) -> Option<LogEvent> {
-    match log {
-      LogLine::Good(log) => {
-        if self.tags.contains(&log.tag) {
-          Some(LogEvent::Tick)
-        } else {
-          self.tags.insert(log.tag.clone());
-          Some(LogEvent::NewTag(log.tag.clone()))
-        }
-      }
-      LogLine::Bad(_) => Some(LogEvent::Tick),
+  fn update_tag(&mut self, log: &LogLine, data_board: &DataBoard) {
+    if let LogLine::Good(log) = log {
+      data_board.update_tag(&log.tag);
     }
   }
 }

@@ -20,7 +20,7 @@ where
       _ = tokio::time::sleep(tokio::time::Duration::from_millis(1000)) => {
         break;
       },
-      Some(event) = reader.changed() => {
+      Some(events) = reader.changed() => for event in events {
         match event {
           Event::NewHead(s) => {
             println!("Head changed {:?}", s);

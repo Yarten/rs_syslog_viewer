@@ -4,7 +4,7 @@
 use crate::file::{
   Event, Reader,
   reader::{self, Config, ReadDirection, ReaderBase, State},
-  watcher::{ChangedEvent, MetadataEvent},
+  watcher::{ChangedEvent},
 };
 use anyhow::Result;
 use std::{os::fd::AsRawFd, path::Path};
@@ -92,8 +92,8 @@ impl ReaderBase for TailReader {
     Ok(())
   }
 
-  async fn changed(&mut self) -> Option<Event> {
-    self.rx.recv().await
+  async fn changed(&mut self) -> Option<Vec<Event>> {
+    reader::poll_events(&mut self.rx, self.config.recv_buffer_size).await
   }
 }
 

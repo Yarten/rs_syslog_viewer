@@ -1,5 +1,6 @@
-use rs_syslog_viewer::log::{Event, LogFile, LogLine};
-use std::collections::HashSet;
+use rs_syslog_viewer::log::{DataBoard, Event, LogFile, LogLine};
+use std::collections::{BTreeSet, HashSet};
+use std::sync::Arc;
 
 mod common;
 
@@ -12,42 +13,35 @@ async fn test_log_file() {
     .map(|line| LogLine::new(line))
     .collect();
 
-  let true_tags: HashSet<String> = true_content
+  let true_tags: BTreeSet<String> = true_content
     .iter()
-    .map_while(|line| match line {
+    .filter_map(|line| match line {
       LogLine::Good(line) => Some(line),
       LogLine::Bad(_) => None,
     })
     .map(|x| x.tag.clone())
     .collect();
 
-  let mut log_file = LogFile::open(log_path, false, HashSet::new())
+  let data_board = Arc::new(DataBoard::default());
+
+  let mut log_file = LogFile::open(log_path, false)
     .await
     .expect("Could not open log file");
 
-  let mut tags = HashSet::new();
   loop {
     tokio::select! {
       _ = tokio::time::sleep(tokio::time::Duration::from_millis(1000)) => {
         break;
       },
-      Some(event) = log_file.update() => {
-        match event {
-          Event::Tick => {}
-          Event::Removed => {}
-          Event::NewTag(new_tag) => {
-            tags.insert(new_tag);
-          }
-        }
-      }
+      _ = log_file.update(data_board.clone()) => {}
     }
   }
 
   let mut content: Vec<LogLine> = Vec::new();
-  for (index, line) in log_file.iter_forward_from_head() {
+  for (_, line) in log_file.iter_forward_from_head() {
     content.push(line.clone());
   }
 
   assert_eq!(&content, &true_content);
-  assert_eq!(&tags, &true_tags);
+  assert_eq!(&*data_board.get_tags(), &true_tags);
 }

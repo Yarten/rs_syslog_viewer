@@ -2,12 +2,12 @@ use std::{
   collections::{HashSet, VecDeque},
   fs,
   path::PathBuf,
+  sync::Arc,
 };
 use crate::log::{
-  LogFile, Event,
+  LogFile, Event, DataBoard,
   log_file_content::{Index as LogFileContentIndex},
 };
-
 
 /// 索引某一个系统日志中的某一行
 pub struct Index {
@@ -27,9 +27,6 @@ pub struct RotatedLog {
   /// 有序的多份日志文件，序号越靠前
   log_files: VecDeque<LogFile>,
 
-  /// 持续收集的日志标签，用于检查是否有新的，如果出现新的，向上一层报告
-  tags: HashSet<String>,
-
   /// 期望加载上一个日志
   want_older_log: bool
 }
@@ -41,7 +38,6 @@ impl RotatedLog {
     Self {
       path,
       log_files: VecDeque::with_capacity(possible_max_rotated_count),
-      tags: HashSet::new(),
       want_older_log: false
     }
   }
@@ -63,32 +59,32 @@ impl RotatedLog {
   }
 
   /// 处理日志内容的变更、文件的滚动与删除
-  pub async fn update(&mut self) -> Option<Event> {
+  pub async fn update(&mut self, data_board: Arc<DataBoard>) -> Option<Event> {
     // select 所有日志文件的事件
     let async_fns: Vec<_> =
       self
         .log_files
         .iter_mut()
-        .map(|log_file| {Box::pin(log_file.update())})
+        .map(|log_file| {Box::pin(log_file.update(data_board.clone()))})
         .collect();
 
     // 处理其中一个，其余取消处理
     let (result, index, _) = futures::future::select_all(async_fns).await;
 
-    match result {
-      None => return None,
-      Some(result) => match result {
-        Event::Tick => {}
-
-        // 处理文件的删除
-        Event::Removed => {
-          if let Some(mut log_file) = self.log_files.remove(index) {
-            let _ = log_file.close().await;
-          }
-        }
-        Event::NewTag(_) => {}
-      }
-    }
+    // match result {
+    //   None => return None,
+    //   Some(result) => match result {
+    //     Event::Tick => {}
+    // 
+    //     // 处理文件的删除
+    //     Event::Removed => {
+    //       if let Some(mut log_file) = self.log_files.remove(index) {
+    //         let _ = log_file.close().await;
+    //       }
+    //     }
+    //     Event::NewTag(_) => {}
+    //   }
+    // }
 
     None
   }
@@ -219,7 +215,13 @@ impl RotatedLog {
   /// 打开指定路径的日志文件
   async fn open_log_file(&self, path: PathBuf) -> Option<LogFile> {
     println!("load log file {:?}", path);
-    match LogFile::open(path, true, self.tags.clone()).await {
+    
+    // 如果要求被加载的日志文件名称等于系统日志最新的那份文件名称，
+    // 则我们认为我们在打开一份正在被实时更新的日志文件
+    let is_loading_rolling_log = &path == &self.path;
+    
+    // 打开这一份日志文件
+    match LogFile::open(path, is_loading_rolling_log).await {
       Ok(log_file) => {
         Some(log_file)
       }

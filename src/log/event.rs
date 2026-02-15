@@ -5,7 +5,4 @@ pub enum Event {
 
   /// 代表本日志被删除
   Removed,
-
-  /// 找到新的日志标签（仅代表本日志中找到的，可能全局范围内已经存在）
-  NewTag(String),
 }

@@ -80,8 +80,8 @@ impl ReaderBase for HeadReader {
     Ok(())
   }
 
-  async fn changed(&mut self) -> Option<Event> {
-    self.rx.recv().await
+  async fn changed(&mut self) -> Option<Vec<Event>> {
+    reader::poll_events(&mut self.rx, self.config.recv_buffer_size).await
   }
 }
 
