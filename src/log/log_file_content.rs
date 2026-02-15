@@ -9,11 +9,15 @@ pub struct Index {
 }
 
 impl Index {
-  pub fn new(chunk_index: usize, line_index: usize) -> Self {
+  pub(super) fn new(chunk_index: usize, line_index: usize) -> Self {
     Self {
       chunk_index,
       line_index,
     }
+  }
+
+  pub(super) fn zero() -> Self {
+    Self::new(0, 0)
   }
 }
 
@@ -239,7 +243,7 @@ impl LogFileContent {
   }
 
   pub fn first_index(&self) -> Index {
-    Index::new(0, 0)
+    Index::zero()
   }
 
   pub fn last_index(&self) -> Index {
@@ -259,6 +263,7 @@ impl Default for LogFileContent {
   }
 }
 
+/// 支持和索引互相转换的，一份日志文件内的正向迭代器
 pub struct ForwardIter<'a> {
   index: Index,
   data: &'a LogFileContent,
@@ -286,6 +291,7 @@ impl<'a> Iterator for ForwardIter<'a> {
   }
 }
 
+/// 支持和索引互相转换的，一份日志文件内的逆向迭代器
 pub struct BackwardIter<'a> {
   index: Index,
   data: &'a LogFileContent,

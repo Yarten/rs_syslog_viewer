@@ -1,13 +1,10 @@
-use std::{
-  collections::{HashSet, VecDeque},
-  fs,
-  path::PathBuf,
-  sync::Arc,
-};
 use crate::log::{
-  LogFile, Event, DataBoard,
-  log_file_content::{Index as LogFileContentIndex},
+  DataBoard, Event, LogFile, LogLine,
+  log_file_content::{
+    BackwardIter as LogFileBackwardIter, ForwardIter as LogFileForwardIter, Index as LogFileIndex,
+  },
 };
+use std::{collections::VecDeque, fs, path::PathBuf, sync::Arc};
 
 /// 索引某一个系统日志中的某一行
 pub struct Index {
@@ -15,7 +12,16 @@ pub struct Index {
   file_index: usize,
 
   /// 指向了某一份 `LogFile` 后的其中一行的索引
-  line_index: LogFileContentIndex
+  line_index: LogFileIndex,
+}
+
+impl Index {
+  fn new(file_index: usize, line_index: LogFileIndex) -> Self {
+    Self {
+      file_index,
+      line_index,
+    }
+  }
 }
 
 /// 维护一组由 syslog 滚动的系统日志，
@@ -28,18 +34,23 @@ pub struct RotatedLog {
   log_files: VecDeque<LogFile>,
 
   /// 期望加载上一个日志
-  want_older_log: bool
+  want_older_log: bool,
 }
 
 impl RotatedLog {
   /// 创建新的一组系统日志文件维护实例，给定的 `path` 参数是未带回滚后缀的路径，
   /// 本类会自动在相同目录下，扫描它的被滚动的其他日志。
-  fn new(path: PathBuf, possible_max_rotated_count: usize) -> Self {
+  pub fn new(path: PathBuf, possible_max_rotated_count: usize) -> Self {
     Self {
       path,
       log_files: VecDeque::with_capacity(possible_max_rotated_count),
-      want_older_log: false
+      want_older_log: false,
     }
+  }
+
+  /// 标记期望获得更旧一点的日志
+  pub fn set_want_older_log(&mut self) {
+    self.want_older_log = true;
   }
 
   /// 一个轮询周期内，在检查各个日志文件内容变更前，加载新的日志文件、
@@ -59,34 +70,27 @@ impl RotatedLog {
   }
 
   /// 处理日志内容的变更、文件的滚动与删除
-  pub async fn update(&mut self, data_board: Arc<DataBoard>) -> Option<Event> {
+  pub async fn update(&mut self, data_board: Arc<DataBoard>) {
     // select 所有日志文件的事件
-    let async_fns: Vec<_> =
-      self
-        .log_files
-        .iter_mut()
-        .map(|log_file| {Box::pin(log_file.update(data_board.clone()))})
-        .collect();
+    let async_fns: Vec<_> = self
+      .log_files
+      .iter_mut()
+      .map(|log_file| Box::pin(log_file.update(data_board.clone())))
+      .collect();
 
     // 处理其中一个，其余取消处理
-    let (result, index, _) = futures::future::select_all(async_fns).await;
+    let (events, index, _) = futures::future::select_all(async_fns).await;
 
-    // match result {
-    //   None => return None,
-    //   Some(result) => match result {
-    //     Event::Tick => {}
-    // 
-    //     // 处理文件的删除
-    //     Event::Removed => {
-    //       if let Some(mut log_file) = self.log_files.remove(index) {
-    //         let _ = log_file.close().await;
-    //       }
-    //     }
-    //     Event::NewTag(_) => {}
-    //   }
-    // }
-
-    None
+    // 处理该日志可能的删除事件
+    if let Some(events) = events {
+      for event in events {
+        if let Event::Removed = event
+          && let Some(mut log_file) = self.log_files.remove(index)
+        {
+          let _ = log_file.close().await;
+        }
+      }
+    }
   }
 
   /// 若当前还未加载最新的日志文件，也即系统正在更新的那一份（如 x.log），则尝试加载它。
@@ -95,12 +99,12 @@ impl RotatedLog {
     // 目前已经加载的最新日志文件的路径
     let loaded_latest_path = match self.log_files.back() {
       None => &PathBuf::new(),
-      Some(log_file ) => log_file.path()
+      Some(log_file) => log_file.path(),
     };
 
     // 快速路径判断：如果最新的路径等于系统正在更新的路径，则结束处理
     if loaded_latest_path == &self.path {
-      return None
+      return None;
     }
 
     // 找到目录下，最新的一份日志文件（在 x.log, x.log.1, x.log.2 中找）
@@ -108,13 +112,13 @@ impl RotatedLog {
 
     // 如果最新的这一份文件已经被加载，则结束处理
     if loaded_latest_path == &latest_path {
-      return None
+      return None;
     }
 
     // 加载最新的文件
-    self.log_files.push_back(
-      self.open_log_file(latest_path).await?
-    );
+    self
+      .log_files
+      .push_back(self.open_log_file(latest_path).await?);
 
     None
   }
@@ -126,11 +130,9 @@ impl RotatedLog {
 
     // 找到字典序最小的路径，即为最新的文件
     // （x.log, x.log.1, x.log.2 中，x.log 比 x.log.1 新，x.log.1 比 x.log.2 新）
-    self.visit_log_paths(
-      |path: PathBuf| {
-        Self::update_with_latest_path(&mut latest_path, path);
-      }
-    );
+    self.visit_log_paths(|path: PathBuf| {
+      Self::update_with_latest_path(&mut latest_path, path);
+    });
 
     // 返回可能找到的最新文件路径
     latest_path
@@ -140,7 +142,7 @@ impl RotatedLog {
   async fn maybe_load_older_log(&mut self) -> Option<()> {
     // 判断是否有设置想要加载一份老日志的标志
     if !self.want_older_log {
-      return None
+      return None;
     }
     self.want_older_log = false;
 
@@ -148,9 +150,9 @@ impl RotatedLog {
     let older_path = self.find_older_log_path()?;
 
     // 加载这一份日志文件
-    self.log_files.push_front(
-      self.open_log_file(older_path).await?
-    );
+    self
+      .log_files
+      .push_front(self.open_log_file(older_path).await?);
 
     None
   }
@@ -163,13 +165,11 @@ impl RotatedLog {
     let mut next_older_path: Option<PathBuf> = None;
 
     // 找到比已经加载的最老文件更老，但又在这些更老的文件中最新的那一个
-    self.visit_log_paths(
-      |path: PathBuf| {
-        if &path > loaded_oldest_path {
-          Self::update_with_latest_path(&mut next_older_path, path);
-        }
+    self.visit_log_paths(|path: PathBuf| {
+      if &path > loaded_oldest_path {
+        Self::update_with_latest_path(&mut next_older_path, path);
       }
-    );
+    });
 
     next_older_path
   }
@@ -185,7 +185,7 @@ impl RotatedLog {
 
       // 跳过文件的情况（很少命中这种情况）
       if !entry.file_type().ok()?.is_file() {
-        continue
+        continue;
       }
 
       // 找到有本系统日志名称前缀的文件，它们就是和本系统日志相关的文件，接着处理它们
@@ -215,20 +215,133 @@ impl RotatedLog {
   /// 打开指定路径的日志文件
   async fn open_log_file(&self, path: PathBuf) -> Option<LogFile> {
     println!("load log file {:?}", path);
-    
+
     // 如果要求被加载的日志文件名称等于系统日志最新的那份文件名称，
     // 则我们认为我们在打开一份正在被实时更新的日志文件
-    let is_loading_rolling_log = &path == &self.path;
-    
+    let is_rolling_log = &path == &self.path;
+
     // 打开这一份日志文件
-    match LogFile::open(path, is_loading_rolling_log).await {
-      Ok(log_file) => {
-        Some(log_file)
-      }
+    match LogFile::open(path, is_rolling_log).await {
+      Ok(log_file) => Some(log_file),
       Err(e) => {
         eprintln!("failed to load log file: {}", e);
         None
       }
+    }
+  }
+}
+
+/// 支持和索引互相转换的、 一组日志的正向迭代器，也即从旧往新的日志内容的迭代
+pub struct ForwardIter<'a> {
+  file_index: usize,
+  file_iter: Option<LogFileForwardIter<'a>>,
+  data: &'a RotatedLog,
+}
+
+impl<'a> Iterator for ForwardIter<'a> {
+  type Item = (Index, &'a LogLine);
+
+  fn next(&mut self) -> Option<Self::Item> {
+    match &mut self.file_iter {
+      None => None,
+      Some(file_iter) => match file_iter.next() {
+        None => {
+          self.file_index += 1;
+          self.file_iter = self
+            .data
+            .log_files
+            .get(self.file_index)
+            .and_then(|log_file| Some(log_file.iter_forward_from_head()));
+          self.next()
+        }
+        Some((line_index, line)) => Some((Index::new(self.file_index, line_index), line)),
+      },
+    }
+  }
+}
+
+/// 支持和索引互相转换的、 一组日志的逆向迭代器，也即从新到旧的日志内容的迭代
+pub struct BackwardIter<'a> {
+  file_index: usize,
+  file_iter: Option<LogFileBackwardIter<'a>>,
+  data: &'a RotatedLog,
+}
+
+impl<'a> Iterator for BackwardIter<'a> {
+  type Item = (Index, &'a LogLine);
+
+  fn next(&mut self) -> Option<Self::Item> {
+    match &mut self.file_iter {
+      None => None,
+      Some(file_iter) => match file_iter.next() {
+        None => {
+          self.file_index = self.file_index.overflowing_sub(1).0;
+          self.file_iter = self
+            .data
+            .log_files
+            .get(self.file_index)
+            .and_then(|log_file| Some(log_file.iter_backward_from_tail()));
+          self.next()
+        }
+        Some((line_index, line)) => Some((Index::new(self.file_index, line_index), line)),
+      },
+    }
+  }
+}
+
+impl RotatedLog {
+  /// 获取从指定索引位置开始正向遍历的迭代器
+  pub fn iter_forward_from(&'_ self, index: Index) -> ForwardIter<'_> {
+    ForwardIter {
+      file_index: index.file_index,
+      file_iter: self
+        .log_files
+        .get(index.file_index)
+        .and_then(|log_file| Some(log_file.iter_forward_from(index.line_index))),
+      data: &self,
+    }
+  }
+
+  /// 获取从指定索引位置开始逆向遍历的迭代器
+  pub fn iter_backward_from(&'_ self, index: Index) -> BackwardIter<'_> {
+    BackwardIter {
+      file_index: index.file_index,
+      file_iter: self
+        .log_files
+        .get(index.file_index)
+        .and_then(|log_file| Some(log_file.iter_backward_from(index.line_index))),
+      data: &self,
+    }
+  }
+
+  /// 获取从第一条日志开始正向遍历的迭代器
+  pub fn iter_forward_from_head(&'_ self) -> ForwardIter<'_> {
+    self.iter_forward_from(self.first_index())
+  }
+
+  /// 获取从最后一条日志开始逆向遍历的迭代器
+  pub fn iter_backward_from_tail(&'_ self) -> BackwardIter<'_> {
+    self.iter_backward_from(self.last_index())
+  }
+
+  /// 获取指向第一条日志的索引
+  pub fn first_index(&self) -> Index {
+    Index {
+      file_index: 0,
+      line_index: LogFileIndex::zero(),
+    }
+  }
+
+  /// 获取指向最后一条日志的索引
+  pub fn last_index(&self) -> Index {
+    let file_index = self.log_files.len().saturating_sub(1);
+    let line_index = match self.log_files.get(file_index) {
+      None => LogFileIndex::zero(),
+      Some(log_file) => log_file.last_index(),
+    };
+    Index {
+      file_index,
+      line_index,
     }
   }
 }

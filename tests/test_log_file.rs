@@ -1,3 +1,4 @@
+use log::log;
 use rs_syslog_viewer::log::{DataBoard, Event, LogFile, LogLine};
 use std::collections::{BTreeSet, HashSet};
 use std::sync::Arc;
@@ -12,18 +13,10 @@ async fn test_log_file() {
     .into_iter()
     .map(|line| LogLine::new(line))
     .collect();
-
-  let true_tags: BTreeSet<String> = true_content
-    .iter()
-    .filter_map(|line| match line {
-      LogLine::Good(line) => Some(line),
-      LogLine::Bad(_) => None,
-    })
-    .map(|x| x.tag.clone())
-    .collect();
+  let true_reversed_content: Vec<LogLine> = true_content.iter().rev().cloned().collect();
+  let true_tags: BTreeSet<String> = common::all_tags(&true_content);
 
   let data_board = Arc::new(DataBoard::default());
-
   let mut log_file = LogFile::open(log_path, false)
     .await
     .expect("Could not open log file");
@@ -37,11 +30,10 @@ async fn test_log_file() {
     }
   }
 
-  let mut content: Vec<LogLine> = Vec::new();
-  for (_, line) in log_file.iter_forward_from_head() {
-    content.push(line.clone());
-  }
+  let content: Vec<LogLine> = common::collect_lines(log_file.iter_forward_from_head());
+  let reversed_content: Vec<LogLine> = common::collect_lines(log_file.iter_backward_from_tail());
 
   assert_eq!(&content, &true_content);
+  assert_eq!(&reversed_content, &true_reversed_content);
   assert_eq!(&*data_board.get_tags(), &true_tags);
 }

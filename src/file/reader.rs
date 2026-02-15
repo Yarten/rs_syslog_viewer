@@ -360,9 +360,5 @@ pub async fn update_tail_line(
 pub async fn poll_events(rx: &mut mpsc::Receiver<Event>, buf_size: usize) -> Option<Vec<Event>> {
   let mut buf = Vec::with_capacity(buf_size);
   let count = rx.recv_many(&mut buf, buf_size).await;
-  if count == 0 {
-    None
-  } else {
-    Some(buf)
-  }
+  if count == 0 { None } else { Some(buf) }
 }

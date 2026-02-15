@@ -3,7 +3,7 @@ use crate::file::{
   Event, HeadReader, TailReader,
   reader::{self, Reader, ReaderBase},
 };
-use crate::log::{Event as LogEvent, LogLine, DataBoard};
+use crate::log::{DataBoard, Event as LogEvent, LogLine};
 use anyhow::Result;
 use enum_dispatch::enum_dispatch;
 use std::{
@@ -56,7 +56,7 @@ impl LogFile {
   }
 
   /// 处理一次文件内容的变更检查与处理
-  /// 
+  ///
   /// # Cancel Safety
   /// 本函数保证，当 await 被取消时，没有副作用。
   pub async fn update(&mut self, data_board: Arc<DataBoard>) -> Option<Vec<LogEvent>> {
@@ -66,26 +66,24 @@ impl LogFile {
       // 如果是删除事件，则直接向调用者透传。
       events
         .into_iter()
-        .filter_map(|event| {
-          match event {
-            Event::NewHead(s) => {
-              let new_log = LogLine::new(s);
-              self.update_tag(&new_log, &data_board);
-              self.content.push_front(new_log);
-              None
-            }
-            Event::NewTail(s) => {
-              let new_log = LogLine::new(s);
-              self.update_tag(&new_log, &data_board);
-              self.content.push_back(new_log);
-              None
-            }
-            Event::Renamed(new_path) => {
-              self.path = new_path;
-              None
-            }
-            Event::Removed => Some(LogEvent::Removed),
+        .filter_map(|event| match event {
+          Event::NewHead(s) => {
+            let new_log = LogLine::new(s);
+            self.update_tag(&new_log, &data_board);
+            self.content.push_front(new_log);
+            None
           }
+          Event::NewTail(s) => {
+            let new_log = LogLine::new(s);
+            self.update_tag(&new_log, &data_board);
+            self.content.push_back(new_log);
+            None
+          }
+          Event::Renamed(new_path) => {
+            self.path = new_path;
+            None
+          }
+          Event::Removed => Some(LogEvent::Removed),
         })
         .collect::<Vec<LogEvent>>()
         .into()
@@ -122,11 +120,11 @@ impl LogFile {
   pub fn first_index(&self) -> Index {
     self.content.first_index()
   }
-  
+
   pub fn last_index(&self) -> Index {
     self.content.last_index()
   }
-  
+
   pub fn path(&self) -> &PathBuf {
     &self.path
   }

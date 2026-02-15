@@ -4,7 +4,7 @@
 use crate::file::{
   Event, Reader,
   reader::{self, Config, ReadDirection, ReaderBase, State},
-  watcher::{ChangedEvent},
+  watcher::ChangedEvent,
 };
 use anyhow::Result;
 use std::{os::fd::AsRawFd, path::Path};
