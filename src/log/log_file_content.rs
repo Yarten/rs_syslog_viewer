@@ -231,16 +231,24 @@ impl LogFileContent {
   }
 
   pub fn iter_forward_from_head(&'_ self) -> ForwardIter<'_> {
-    self.iter_forward_from(Index::new(0, 0))
+    self.iter_forward_from(self.first_index())
   }
 
   pub fn iter_backward_from_tail(&'_ self) -> BackwardIter<'_> {
+    self.iter_backward_from(self.last_index())
+  }
+
+  pub fn first_index(&self) -> Index {
+    Index::new(0, 0)
+  }
+
+  pub fn last_index(&self) -> Index {
     let chunk_index = self.chunks.len().saturating_sub(1);
     let line_index = match self.chunks.get(chunk_index) {
       None => 0,
       Some(chunk) => chunk.len().saturating_sub(1),
     };
-    self.iter_backward_from(Index::new(chunk_index, line_index))
+    Index::new(chunk_index, line_index)
   }
 }
 

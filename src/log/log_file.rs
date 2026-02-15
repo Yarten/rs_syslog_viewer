@@ -58,6 +58,9 @@ impl LogFile {
   }
 
   /// 处理一次文件内容的变更检查与处理
+  /// 
+  /// # Cancel Safety
+  /// 本函数保证，当 await 被取消时，没有副作用。
   pub async fn update(&mut self) -> Option<LogEvent> {
     if let Some(event) = self.reader.changed().await {
       match event {
@@ -86,6 +89,9 @@ impl LogFile {
   }
 
   /// 关闭本日志的异步监听流程
+  /// 
+  /// # Cancel Safety
+  /// 本函数保证 await 被终止时，没有副作用，异步的流程仍然会在后台完全结束。
   pub async fn close(&mut self) -> Result<()> {
     Ok(self.reader.stop().await?)
   }
@@ -106,6 +112,18 @@ impl LogFile {
     self.content.iter_backward_from_tail()
   }
 
+  pub fn first_index(&self) -> Index {
+    self.content.first_index()
+  }
+  
+  pub fn last_index(&self) -> Index {
+    self.content.last_index()
+  }
+  
+  pub fn path(&self) -> &PathBuf {
+    &self.path
+  }
+
   /// 检查给定的新日志行，是否带来了新的、未知的日志标签
   fn update_tag(&mut self, log: &LogLine) -> Option<LogEvent> {
     match log {
@@ -120,12 +138,4 @@ impl LogFile {
       LogLine::Bad(_) => Some(LogEvent::Tick),
     }
   }
-}
-
-#[cfg(test)]
-mod tests {
-  use super::*;
-
-  #[test]
-  fn test_log_file() {}
 }
