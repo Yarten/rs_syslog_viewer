@@ -68,19 +68,28 @@ impl StatusBar {
     }
   }
 
-  pub fn set_info(&mut self, message: String) {
+  pub fn set_info<T>(&mut self, message: T)
+  where
+    T: Into<String>,
+  {
     self.mode = Mode::Info;
-    self.message = message;
+    self.message = message.into();
   }
 
-  pub fn set_error(&mut self, message: String) {
+  pub fn set_error<T>(&mut self, message: T)
+  where
+    T: Into<String>,
+  {
     self.mode = Mode::Error;
-    self.message = message;
+    self.message = message.into();
   }
 
-  pub fn set_input(&mut self, message: String) {
+  pub fn set_input<T>(&mut self, message: T)
+  where
+    T: Into<String>,
+  {
     self.mode = Mode::Input;
-    self.message = message + ": ";
+    self.message = message.into() + ": ";
     self.reset_input();
   }
 

@@ -36,6 +36,33 @@ impl Page for DefaultPage {
   }
 }
 
+/// 测试用的页面
+pub struct DemoPage {
+  name: String,
+}
+
+impl DemoPage {
+  pub fn new<T>(name: T) -> Self
+  where
+    T: Into<String>,
+  {
+    Self { name: name.into() }
+  }
+}
+
+impl Page for DemoPage {
+  fn render(&self, area: Rect, buf: &mut Buffer, input: Option<String>) {
+    Paragraph::new(self.name.clone() + " Good")
+      .style(Style::new().bg(Color::DarkGray).fg(Color::White))
+      .alignment(Alignment::Center)
+      .render(area, buf);
+  }
+
+  fn title(&self) -> &str {
+    &self.name
+  }
+}
+
 #[derive(Copy, Clone)]
 pub struct PageTheme {
   borders: Borders,
@@ -159,16 +186,21 @@ impl Pager {
     }
   }
 
+  pub fn add_page(mut self, index: usize, page: Box<dyn Page>) -> Self {
+    self.pages.insert(index, page);
+    self
+  }
+
+  pub fn add_page_as_root(mut self, page: Box<dyn Page>) -> Self {
+    self.root_page = page;
+    self
+  }
+}
+
+
+impl Pager {
   pub fn status(&mut self) -> &mut StatusBar {
     &mut self.status_bar
-  }
-
-  pub fn add_page(&mut self, index: usize, page: Box<dyn Page>) {
-    self.pages.insert(index, page);
-  }
-
-  pub fn add_page_as_root(&mut self, page: Box<dyn Page>) {
-    self.root_page = page;
   }
 
   /// 在左半边打开指定的子页面。
