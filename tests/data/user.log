@@ -1,0 +1,300 @@
+2026-02-15T09:35:46.261184+08:00 yarten-Dell-G16-7630 /usr/libexec/gdm-x-session[1883]: (**) Option "config_info" "udev:/sys/devices/pci0000:00/0000:00:14.0/usb1/1-6/1-6:1.0/0003:0D62:CCBC.0003/input/input10/event8"
+2026-02-15T09:35:46.261204+08:00 yarten-Dell-G16-7630 /usr/libexec/gdm-x-session[1883]: (II) XINPUT: Adding extended input device "DELL Technologies Keyboard" (type: KEYBOARD, id 19)
+2026-02-15T09:35:46.261227+08:00 yarten-Dell-G16-7630 /usr/libexec/gdm-x-session[1883]: (**) Option "xkb_model" "pc105"
+2026-02-15T09:35:46.261246+08:00 yarten-Dell-G16-7630 /usr/libexec/gdm-x-session[1883]: (**) Option "xkb_layout" "us"
+2026-02-15T09:35:46.261273+08:00 yarten-Dell-G16-7630 /usr/libexec/gdm-x-session[1883]: (**) Logitech G502: Applying InputClass "libinput pointer catchall"
+2026-02-15T09:35:46.261293+08:00 yarten-Dell-G16-7630 /usr/libexec/gdm-x-session[1883]: (**) Logitech G502: Applying InputClass "libinput keyboard catchall"
+2026-02-15T09:35:46.261313+08:00 yarten-Dell-G16-7630 /usr/libexec/gdm-x-session[1883]: (II) Using input driver 'libinput' for 'Logitech G502'
+2026-02-15T09:35:46.261332+08:00 yarten-Dell-G16-7630 /usr/libexec/gdm-x-session[1883]: (II) systemd-logind: returning pre-existing fd for /dev/input/event9 13:73
+2026-02-15T09:35:46.261354+08:00 yarten-Dell-G16-7630 /usr/libexec/gdm-x-session[1883]: (**) Logitech G502: always reports core events
+2026-02-15T09:35:46.261377+08:00 yarten-Dell-G16-7630 /usr/libexec/gdm-x-session[1883]: (**) Option "Device" "/dev/input/event9"
+2026-02-15T09:35:46.261398+08:00 yarten-Dell-G16-7630 /usr/libexec/gdm-x-session[1883]: (II) libinput: Logitech G502: is a virtual subdevice
+2026-02-15T09:35:46.261429+08:00 yarten-Dell-G16-7630 /usr/libexec/gdm-x-session[1883]: (**) Option "config_info" "udev:/sys/devices/pci0000:00/0000:00:14.0/usb1/1-9/1-9:1.2/0003:046D:C539.0006/0003:046D:407F.0007/input/input21/event9"
+2026-02-15T09:35:46.261449+08:00 yarten-Dell-G16-7630 /usr/libexec/gdm-x-session[1883]: (II) XINPUT: Adding extended input device "Logitech G502" (type: KEYBOARD, id 20)
+2026-02-15T09:35:46.261469+08:00 yarten-Dell-G16-7630 /usr/libexec/gdm-x-session[1883]: (**) Option "xkb_model" "pc105"
+2026-02-15T09:35:46.261489+08:00 yarten-Dell-G16-7630 /usr/libexec/gdm-x-session[1883]: (**) Option "xkb_layout" "us"
+2026-02-15T09:35:46.268393+08:00 yarten-Dell-G16-7630 /usr/libexec/gdm-x-session[2031]: /usr/bin/prime-supported: 38: cannot create /var/log/prime-supported.log: Permission denied
+2026-02-15T09:35:46.268616+08:00 yarten-Dell-G16-7630 /usr/libexec/gdm-x-session[2029]: /sbin/prime-offload: 29: cannot create /var/log/prime-offload.log: Permission denied
+2026-02-15T09:35:46.336923+08:00 yarten-Dell-G16-7630 /usr/libexec/gdm-x-session[2033]: dbus-daemon[2033]: [session uid=128 pid=2033] Activating service name='org.a11y.Bus' requested by ':1.0' (uid=128 pid=2035 comm="/usr/libexec/gnome-session-check-accelerated " label="unconfined")
+2026-02-15T09:35:46.344233+08:00 yarten-Dell-G16-7630 /usr/libexec/gdm-x-session[2033]: dbus-daemon[2033]: [session uid=128 pid=2033] Successfully activated service 'org.a11y.Bus'
+2026-02-15T09:35:46.467695+08:00 yarten-Dell-G16-7630 gnome-session[2034]: gnome-session-binary[2034]: GLib-GIO-CRITICAL: g_bus_get_sync: assertion 'error == NULL || *error == NULL' failed
+2026-02-15T09:35:46.467903+08:00 yarten-Dell-G16-7630 gnome-session[2034]: gnome-session-binary[2034]: GLib-GIO-CRITICAL: g_bus_get_sync: assertion 'error == NULL || *error == NULL' failed
+2026-02-15T09:35:46.467934+08:00 yarten-Dell-G16-7630 gnome-session-binary[2034]: GLib-GIO-CRITICAL: g_bus_get_sync: assertion 'error == NULL || *error == NULL' failed
+2026-02-15T09:35:46.467982+08:00 yarten-Dell-G16-7630 gnome-session-binary[2034]: GLib-GIO-CRITICAL: g_bus_get_sync: assertion 'error == NULL || *error == NULL' failed
+2026-02-15T09:35:46.542949+08:00 yarten-Dell-G16-7630 gnome-shell[2050]: Running GNOME Shell (using mutter 42.9) as a X11 window and compositing manager
+2026-02-15T09:35:46.597304+08:00 yarten-Dell-G16-7630 /usr/libexec/gdm-x-session[1883]: (--) NVIDIA(GPU-0): DFP-0: disconnected
+2026-02-15T09:35:46.597383+08:00 yarten-Dell-G16-7630 /usr/libexec/gdm-x-session[1883]: (--) NVIDIA(GPU-0): DFP-0: Internal TMDS
+2026-02-15T09:35:46.597413+08:00 yarten-Dell-G16-7630 /usr/libexec/gdm-x-session[1883]: (--) NVIDIA(GPU-0): DFP-0: 165.0 MHz maximum pixel clock
+2026-02-15T09:35:46.597439+08:00 yarten-Dell-G16-7630 /usr/libexec/gdm-x-session[1883]: (--) NVIDIA(GPU-0):
+2026-02-15T09:35:46.598437+08:00 yarten-Dell-G16-7630 /usr/libexec/gdm-x-session[1883]: (--) NVIDIA(GPU-0): BOE Technology Group Co., Ltd (DFP-1): connected
+2026-02-15T09:35:46.598538+08:00 yarten-Dell-G16-7630 /usr/libexec/gdm-x-session[1883]: (--) NVIDIA(GPU-0): BOE Technology Group Co., Ltd (DFP-1): Internal DisplayPort
+2026-02-15T09:35:46.598573+08:00 yarten-Dell-G16-7630 /usr/libexec/gdm-x-session[1883]: (--) NVIDIA(GPU-0): BOE Technology Group Co., Ltd (DFP-1): 2670.0 MHz maximum pixel clock
+2026-02-15T09:35:46.598602+08:00 yarten-Dell-G16-7630 /usr/libexec/gdm-x-session[1883]: (--) NVIDIA(GPU-0):
+2026-02-15T09:35:46.598642+08:00 yarten-Dell-G16-7630 /usr/libexec/gdm-x-session[1883]: (--) NVIDIA(GPU-0): DFP-0: disconnected
+2026-02-15T09:35:46.598672+08:00 yarten-Dell-G16-7630 /usr/libexec/gdm-x-session[1883]: (--) NVIDIA(GPU-0): DFP-0: Internal TMDS
+2026-02-15T09:35:46.598700+08:00 yarten-Dell-G16-7630 /usr/libexec/gdm-x-session[1883]: (--) NVIDIA(GPU-0): DFP-0: 165.0 MHz maximum pixel clock
+2026-02-15T09:35:46.598728+08:00 yarten-Dell-G16-7630 /usr/libexec/gdm-x-session[1883]: (--) NVIDIA(GPU-0):
+2026-02-15T09:35:46.599736+08:00 yarten-Dell-G16-7630 /usr/libexec/gdm-x-session[1883]: (--) NVIDIA(GPU-0): BOE Technology Group Co., Ltd (DFP-1): connected
+2026-02-15T09:35:46.599832+08:00 yarten-Dell-G16-7630 /usr/libexec/gdm-x-session[1883]: (--) NVIDIA(GPU-0): BOE Technology Group Co., Ltd (DFP-1): Internal DisplayPort
+2026-02-15T09:35:46.599901+08:00 yarten-Dell-G16-7630 /usr/libexec/gdm-x-session[1883]: (--) NVIDIA(GPU-0): BOE Technology Group Co., Ltd (DFP-1): 2670.0 MHz maximum pixel clock
+2026-02-15T09:35:46.599939+08:00 yarten-Dell-G16-7630 /usr/libexec/gdm-x-session[1883]: (--) NVIDIA(GPU-0):
+2026-02-15T09:35:46.761563+08:00 yarten-Dell-G16-7630 gnome-shell[2050]: ATK Bridge is disabled but a11y has already been enabled.
+2026-02-15T09:35:46.990757+08:00 yarten-Dell-G16-7630 gnome-shell[2050]: Unset XDG_SESSION_ID, getCurrentSessionProxy() called outside a user session. Asking logind directly.
+2026-02-15T09:35:46.990844+08:00 yarten-Dell-G16-7630 gnome-shell[2050]: Will monitor session c1
+2026-02-15T09:35:46.992687+08:00 yarten-Dell-G16-7630 dbus-daemon[925]: [system] Activating via systemd: service name='org.freedesktop.locale1' unit='dbus-org.freedesktop.locale1.service' requested by ':1.46' (uid=128 pid=2050 comm="/usr/bin/gnome-shell " label="unconfined")
+2026-02-15T09:35:47.004621+08:00 yarten-Dell-G16-7630 systemd[1]: Starting Locale Service...
+2026-02-15T09:35:47.027382+08:00 yarten-Dell-G16-7630 /usr/libexec/gdm-x-session[2033]: dbus-daemon[2033]: [session uid=128 pid=2033] Activating service name='org.freedesktop.impl.portal.PermissionStore' requested by ':1.5' (uid=128 pid=2050 comm="/usr/bin/gnome-shell " label="unconfined")
+2026-02-15T09:35:47.031034+08:00 yarten-Dell-G16-7630 /usr/libexec/gdm-x-session[2033]: dbus-daemon[2033]: [session uid=128 pid=2033] Successfully activated service 'org.freedesktop.impl.portal.PermissionStore'
+2026-02-15T09:35:47.036120+08:00 yarten-Dell-G16-7630 dbus-daemon[925]: [system] Successfully activated service 'org.freedesktop.locale1'
+2026-02-15T09:35:47.036221+08:00 yarten-Dell-G16-7630 systemd[1]: Started Locale Service.
+2026-02-15T09:35:47.045155+08:00 yarten-Dell-G16-7630 NetworkManager[927]: <info>  [1771119347.0448] manager: NetworkManager state is now CONNECTED_GLOBAL
+2026-02-15T09:35:47.070785+08:00 yarten-Dell-G16-7630 dbus-daemon[925]: [system] Activating via systemd: service name='org.freedesktop.GeoClue2' unit='geoclue.service' requested by ':1.46' (uid=128 pid=2050 comm="/usr/bin/gnome-shell " label="unconfined")
+2026-02-15T09:35:47.086287+08:00 yarten-Dell-G16-7630 systemd[1]: Starting Location Lookup Service...
+2026-02-15T09:35:47.090030+08:00 yarten-Dell-G16-7630 dbus-daemon[925]: [system] Activating via systemd: service name='org.freedesktop.PackageKit' unit='packagekit.service' requested by ':1.46' (uid=128 pid=2050 comm="/usr/bin/gnome-shell " label="unconfined")
+2026-02-15T09:35:47.090966+08:00 yarten-Dell-G16-7630 systemd[1]: Starting PackageKit Daemon...
+2026-02-15T09:35:47.094516+08:00 yarten-Dell-G16-7630 gnome-shell[2050]: Extension ding@rastersoft.com already installed in /usr/share/gnome-shell/extensions/ding@rastersoft.com. /usr/share/gnome-shell/extensions/ding@rastersoft.com will not be loaded
+2026-02-15T09:35:47.094556+08:00 yarten-Dell-G16-7630 gnome-shell[2050]: Extension ubuntu-appindicators@ubuntu.com already installed in /usr/share/gnome-shell/extensions/ubuntu-appindicators@ubuntu.com. /usr/share/gnome-shell/extensions/ubuntu-appindicators@ubuntu.com will not be loaded
+2026-02-15T09:35:47.094569+08:00 yarten-Dell-G16-7630 gnome-shell[2050]: Extension ubuntu-dock@ubuntu.com already installed in /usr/share/gnome-shell/extensions/ubuntu-dock@ubuntu.com. /usr/share/gnome-shell/extensions/ubuntu-dock@ubuntu.com will not be loaded
+2026-02-15T09:35:47.095484+08:00 yarten-Dell-G16-7630 /usr/libexec/gdm-x-session[2033]: dbus-daemon[2033]: [session uid=128 pid=2033] Activating service name='org.gnome.Shell.Notifications' requested by ':1.5' (uid=128 pid=2050 comm="/usr/bin/gnome-shell " label="unconfined")
+2026-02-15T09:35:47.095557+08:00 yarten-Dell-G16-7630 PackageKit: daemon start
+2026-02-15T09:35:47.099262+08:00 yarten-Dell-G16-7630 /usr/libexec/gdm-x-session[2042]: dbus-daemon[2042]: Activating service name='org.a11y.atspi.Registry' requested by ':1.1' (uid=128 pid=2050 comm="/usr/bin/gnome-shell " label="unconfined")
+2026-02-15T09:35:47.109087+08:00 yarten-Dell-G16-7630 /usr/libexec/gdm-x-session[2042]: dbus-daemon[2042]: Successfully activated service 'org.a11y.atspi.Registry'
+2026-02-15T09:35:47.109209+08:00 yarten-Dell-G16-7630 /usr/libexec/gdm-x-session[2090]: SpiRegistry daemon is running with well-known name - org.a11y.atspi.Registry
+2026-02-15T09:35:47.111800+08:00 yarten-Dell-G16-7630 dbus-daemon[925]: [system] Successfully activated service 'org.freedesktop.PackageKit'
+2026-02-15T09:35:47.111924+08:00 yarten-Dell-G16-7630 systemd[1]: Started PackageKit Daemon.
+2026-02-15T09:35:47.112603+08:00 yarten-Dell-G16-7630 /usr/libexec/gdm-x-session[1883]: (--) NVIDIA(GPU-0): DFP-0: disconnected
+2026-02-15T09:35:47.112641+08:00 yarten-Dell-G16-7630 /usr/libexec/gdm-x-session[1883]: (--) NVIDIA(GPU-0): DFP-0: Internal TMDS
+2026-02-15T09:35:47.112660+08:00 yarten-Dell-G16-7630 /usr/libexec/gdm-x-session[1883]: (--) NVIDIA(GPU-0): DFP-0: 165.0 MHz maximum pixel clock
+2026-02-15T09:35:47.112677+08:00 yarten-Dell-G16-7630 /usr/libexec/gdm-x-session[1883]: (--) NVIDIA(GPU-0):
+2026-02-15T09:35:47.113839+08:00 yarten-Dell-G16-7630 /usr/libexec/gdm-x-session[1883]: (--) NVIDIA(GPU-0): BOE Technology Group Co., Ltd (DFP-1): connected
+2026-02-15T09:35:47.113867+08:00 yarten-Dell-G16-7630 /usr/libexec/gdm-x-session[1883]: (--) NVIDIA(GPU-0): BOE Technology Group Co., Ltd (DFP-1): Internal DisplayPort
+2026-02-15T09:35:47.113888+08:00 yarten-Dell-G16-7630 /usr/libexec/gdm-x-session[1883]: (--) NVIDIA(GPU-0): BOE Technology Group Co., Ltd (DFP-1): 2670.0 MHz maximum pixel clock
+2026-02-15T09:35:47.113908+08:00 yarten-Dell-G16-7630 /usr/libexec/gdm-x-session[1883]: (--) NVIDIA(GPU-0):
+2026-02-15T09:35:47.114017+08:00 yarten-Dell-G16-7630 /usr/libexec/gdm-x-session[1883]: (--) NVIDIA(GPU-0): DFP-0: disconnected
+2026-02-15T09:35:47.114035+08:00 yarten-Dell-G16-7630 /usr/libexec/gdm-x-session[1883]: (--) NVIDIA(GPU-0): DFP-0: Internal TMDS
+2026-02-15T09:35:47.114052+08:00 yarten-Dell-G16-7630 /usr/libexec/gdm-x-session[1883]: (--) NVIDIA(GPU-0): DFP-0: 165.0 MHz maximum pixel clock
+2026-02-15T09:35:47.114069+08:00 yarten-Dell-G16-7630 /usr/libexec/gdm-x-session[1883]: (--) NVIDIA(GPU-0):
+2026-02-15T09:35:47.115103+08:00 yarten-Dell-G16-7630 /usr/libexec/gdm-x-session[1883]: (--) NVIDIA(GPU-0): BOE Technology Group Co., Ltd (DFP-1): connected
+2026-02-15T09:35:47.115128+08:00 yarten-Dell-G16-7630 /usr/libexec/gdm-x-session[1883]: (--) NVIDIA(GPU-0): BOE Technology Group Co., Ltd (DFP-1): Internal DisplayPort
+2026-02-15T09:35:47.115153+08:00 yarten-Dell-G16-7630 /usr/libexec/gdm-x-session[1883]: (--) NVIDIA(GPU-0): BOE Technology Group Co., Ltd (DFP-1): 2670.0 MHz maximum pixel clock
+2026-02-15T09:35:47.115172+08:00 yarten-Dell-G16-7630 /usr/libexec/gdm-x-session[1883]: (--) NVIDIA(GPU-0):
+2026-02-15T09:35:47.116874+08:00 yarten-Dell-G16-7630 dbus-daemon[925]: [system] Successfully activated service 'org.freedesktop.GeoClue2'
+2026-02-15T09:35:47.116926+08:00 yarten-Dell-G16-7630 systemd[1]: Started Location Lookup Service.
+2026-02-15T09:35:47.121563+08:00 yarten-Dell-G16-7630 /usr/libexec/gdm-x-session[2033]: dbus-daemon[2033]: [session uid=128 pid=2033] Successfully activated service 'org.gnome.Shell.Notifications'
+2026-02-15T09:35:47.123310+08:00 yarten-Dell-G16-7630 org.gnome.Shell.desktop[2050]: Window manager warning: Failed to parse saved session file: Failed to open file “/var/lib/gdm3/.config/mutter/sessions/10af0a6f8096bbf1d8177111934648535900000020340000.ms”: No such file or directory
+2026-02-15T09:35:47.131687+08:00 yarten-Dell-G16-7630 NetworkManager[927]: <info>  [1771119347.1316] manager: startup complete
+2026-02-15T09:35:47.133095+08:00 yarten-Dell-G16-7630 systemd[1]: Finished Network Manager Wait Online.
+2026-02-15T09:35:47.133195+08:00 yarten-Dell-G16-7630 systemd[1]: Reached target Network is Online.
+2026-02-15T09:35:47.133233+08:00 yarten-Dell-G16-7630 systemd[1]: Started Download data for packages that failed at package install time.
+2026-02-15T09:35:47.133354+08:00 yarten-Dell-G16-7630 systemd[1]: Started Check to see whether there is a new version of Ubuntu available.
+2026-02-15T09:35:47.133392+08:00 yarten-Dell-G16-7630 systemd[1]: Reached target Timer Units.
+2026-02-15T09:35:47.146901+08:00 yarten-Dell-G16-7630 kernel: [   11.583503] rfkill: input handler disabled
+2026-02-15T09:35:47.149301+08:00 yarten-Dell-G16-7630 systemd[1]: Started Make remote CUPS printers available locally.
+2026-02-15T09:35:47.149934+08:00 yarten-Dell-G16-7630 systemd[1]: Starting Docker Application Container Engine...
+2026-02-15T09:35:47.150335+08:00 yarten-Dell-G16-7630 /usr/libexec/gdm-x-session[2033]: dbus-daemon[2033]: [session uid=128 pid=2033] Activating service name='org.freedesktop.systemd1' requested by ':1.9' (uid=128 pid=2112 comm="/usr/libexec/gsd-sharing " label="unconfined")
+2026-02-15T09:35:47.150654+08:00 yarten-Dell-G16-7630 systemd[1]: Starting Tool to automatically collect and submit kernel crash signatures...
+2026-02-15T09:35:47.150751+08:00 yarten-Dell-G16-7630 systemd[1]: Condition check resulted in Ubuntu Pro Background Auto Attach being skipped.
+2026-02-15T09:35:47.151374+08:00 yarten-Dell-G16-7630 /usr/libexec/gdm-x-session[2033]: dbus-daemon[2033]: [session uid=128 pid=2033] Activated service 'org.freedesktop.systemd1' failed: Process org.freedesktop.systemd1 exited with status 1
+2026-02-15T09:35:47.151597+08:00 yarten-Dell-G16-7630 gsd-sharing[2112]: Failed to StopUnit service: GDBus.Error:org.freedesktop.DBus.Error.Spawn.ChildExited: Process org.freedesktop.systemd1 exited with status 1
+2026-02-15T09:35:47.151654+08:00 yarten-Dell-G16-7630 gsd-sharing[2112]: Failed to StopUnit service: GDBus.Error:org.freedesktop.DBus.Error.Spawn.ChildExited: Process org.freedesktop.systemd1 exited with status 1
+2026-02-15T09:35:47.152255+08:00 yarten-Dell-G16-7630 /usr/libexec/gdm-x-session[2033]: dbus-daemon[2033]: [session uid=128 pid=2033] Activating service name='org.gtk.vfs.Daemon' requested by ':1.18' (uid=128 pid=2117 comm="ibus-daemon --panel disable --xim " label="unconfined")
+2026-02-15T09:35:47.152997+08:00 yarten-Dell-G16-7630 systemd[1]: kerneloops.service: Found left-over process 2178 (kerneloops) in control group while starting unit. Ignoring.
+2026-02-15T09:35:47.153031+08:00 yarten-Dell-G16-7630 systemd[1]: This usually indicates unclean termination of a previous run, or service implementation deficiencies.
+2026-02-15T09:35:47.156608+08:00 yarten-Dell-G16-7630 systemd[1]: Started Tool to automatically collect and submit kernel crash signatures.
+2026-02-15T09:35:47.160548+08:00 yarten-Dell-G16-7630 /usr/libexec/gdm-x-session[2033]: dbus-daemon[2033]: [session uid=128 pid=2033] Successfully activated service 'org.gtk.vfs.Daemon'
+2026-02-15T09:35:47.164231+08:00 yarten-Dell-G16-7630 /usr/libexec/gdm-x-session[2033]: dbus-daemon[2033]: [session uid=128 pid=2033] Activating service name='org.freedesktop.portal.IBus' requested by ':1.18' (uid=128 pid=2117 comm="ibus-daemon --panel disable --xim " label="unconfined")
+2026-02-15T09:35:47.170241+08:00 yarten-Dell-G16-7630 /usr/libexec/gdm-x-session[2033]: dbus-daemon[2033]: [session uid=128 pid=2033] Successfully activated service 'org.freedesktop.portal.IBus'
+2026-02-15T09:35:47.175307+08:00 yarten-Dell-G16-7630 dbus-daemon[925]: [system] Activating via systemd: service name='org.freedesktop.ColorManager' unit='colord.service' requested by ':1.60' (uid=128 pid=2116 comm="/usr/libexec/gsd-color " label="unconfined")
+2026-02-15T09:35:47.176487+08:00 yarten-Dell-G16-7630 systemd[1]: Starting Manage, Install and Generate Color Profiles...
+2026-02-15T09:35:47.183387+08:00 yarten-Dell-G16-7630 NetworkManager[927]: <info>  [1771119347.1833] agent-manager: agent[8a1f2cac6e34d74c,:1.46/org.gnome.Shell.NetworkAgent/128]: agent registered
+2026-02-15T09:35:47.184364+08:00 yarten-Dell-G16-7630 colord[2211]: failed to get edid data: EDID length is too small
+2026-02-15T09:35:47.185348+08:00 yarten-Dell-G16-7630 dbus-daemon[925]: [system] Successfully activated service 'org.freedesktop.ColorManager'
+2026-02-15T09:35:47.185419+08:00 yarten-Dell-G16-7630 systemd[1]: Started Manage, Install and Generate Color Profiles.
+2026-02-15T09:35:47.190951+08:00 yarten-Dell-G16-7630 spice-vdagent[2224]: vdagent virtio channel /dev/virtio-ports/com.redhat.spice.0 does not exist, exiting
+2026-02-15T09:35:47.192520+08:00 yarten-Dell-G16-7630 gnome-session-binary[2034]: Entering running state
+2026-02-15T09:35:47.195946+08:00 yarten-Dell-G16-7630 xbrlapi.desktop[2234]: openConnection: connect: No such file or directory
+2026-02-15T09:35:47.195989+08:00 yarten-Dell-G16-7630 xbrlapi.desktop[2234]: cannot connect to braille devices daemon brltty at :0
+2026-02-15T09:35:47.197399+08:00 yarten-Dell-G16-7630 gnome-shell[2050]: Error looking up permission: GDBus.Error:org.freedesktop.portal.Error.NotFound: No entry for geolocation
+2026-02-15T09:35:47.218197+08:00 yarten-Dell-G16-7630 /usr/libexec/gdm-x-session[2033]: dbus-daemon[2033]: [session uid=128 pid=2033] Activating service name='org.gnome.ScreenSaver' requested by ':1.25' (uid=128 pid=2143 comm="/usr/libexec/gsd-power " label="unconfined")
+2026-02-15T09:35:47.231381+08:00 yarten-Dell-G16-7630 gsd-media-keys[2129]: Failed to grab accelerator for keybinding settings:rotate-video-lock
+2026-02-15T09:35:47.231447+08:00 yarten-Dell-G16-7630 gsd-media-keys[2129]: Failed to grab accelerator for keybinding settings:playback-repeat
+2026-02-15T09:35:47.231490+08:00 yarten-Dell-G16-7630 gsd-media-keys[2129]: Failed to grab accelerator for keybinding settings:playback-random
+2026-02-15T09:35:47.231523+08:00 yarten-Dell-G16-7630 gsd-media-keys[2129]: Failed to grab accelerator for keybinding settings:hibernate
+2026-02-15T09:35:47.240797+08:00 yarten-Dell-G16-7630 /usr/libexec/gdm-x-session[2033]: dbus-daemon[2033]: [session uid=128 pid=2033] Successfully activated service 'org.gnome.ScreenSaver'
+2026-02-15T09:35:47.282876+08:00 yarten-Dell-G16-7630 dockerd[2170]: time="2026-02-15T09:35:47.282633045+08:00" level=info msg="Starting up"
+2026-02-15T09:35:47.285092+08:00 yarten-Dell-G16-7630 dockerd[2170]: time="2026-02-15T09:35:47.284989672+08:00" level=info msg="OTEL tracing is not configured, using no-op tracer provider"
+2026-02-15T09:35:47.345900+08:00 yarten-Dell-G16-7630 kernel: [   11.783047] evm: overlay not supported
+2026-02-15T09:35:47.347393+08:00 yarten-Dell-G16-7630 dockerd[2170]: time="2026-02-15T09:35:47.347231016+08:00" level=info msg="[graphdriver] using prior storage driver: overlay2"
+2026-02-15T09:35:47.371552+08:00 yarten-Dell-G16-7630 dockerd[2170]: time="2026-02-15T09:35:47.371356301+08:00" level=info msg="Loading containers: start."
+2026-02-15T09:35:47.463073+08:00 yarten-Dell-G16-7630 /usr/libexec/gdm-x-session[1883]: (--) NVIDIA(GPU-0): DFP-0: disconnected
+2026-02-15T09:35:47.463154+08:00 yarten-Dell-G16-7630 /usr/libexec/gdm-x-session[1883]: (--) NVIDIA(GPU-0): DFP-0: Internal TMDS
+2026-02-15T09:35:47.463170+08:00 yarten-Dell-G16-7630 /usr/libexec/gdm-x-session[1883]: (--) NVIDIA(GPU-0): DFP-0: 165.0 MHz maximum pixel clock
+2026-02-15T09:35:47.463183+08:00 yarten-Dell-G16-7630 /usr/libexec/gdm-x-session[1883]: (--) NVIDIA(GPU-0):
+2026-02-15T09:35:47.464049+08:00 yarten-Dell-G16-7630 /usr/libexec/gdm-x-session[1883]: (--) NVIDIA(GPU-0): BOE Technology Group Co., Ltd (DFP-1): connected
+2026-02-15T09:35:47.464100+08:00 yarten-Dell-G16-7630 /usr/libexec/gdm-x-session[1883]: (--) NVIDIA(GPU-0): BOE Technology Group Co., Ltd (DFP-1): Internal DisplayPort
+2026-02-15T09:35:47.464121+08:00 yarten-Dell-G16-7630 /usr/libexec/gdm-x-session[1883]: (--) NVIDIA(GPU-0): BOE Technology Group Co., Ltd (DFP-1): 2670.0 MHz maximum pixel clock
+2026-02-15T09:35:47.464137+08:00 yarten-Dell-G16-7630 /usr/libexec/gdm-x-session[1883]: (--) NVIDIA(GPU-0):
+2026-02-15T09:35:47.464286+08:00 yarten-Dell-G16-7630 /usr/libexec/gdm-x-session[1883]: (--) NVIDIA(GPU-0): DFP-0: disconnected
+2026-02-15T09:35:47.464335+08:00 yarten-Dell-G16-7630 /usr/libexec/gdm-x-session[1883]: (--) NVIDIA(GPU-0): DFP-0: Internal TMDS
+2026-02-15T09:35:47.464353+08:00 yarten-Dell-G16-7630 /usr/libexec/gdm-x-session[1883]: (--) NVIDIA(GPU-0): DFP-0: 165.0 MHz maximum pixel clock
+2026-02-15T09:35:47.464367+08:00 yarten-Dell-G16-7630 /usr/libexec/gdm-x-session[1883]: (--) NVIDIA(GPU-0):
+2026-02-15T09:35:47.465374+08:00 yarten-Dell-G16-7630 /usr/libexec/gdm-x-session[1883]: (--) NVIDIA(GPU-0): BOE Technology Group Co., Ltd (DFP-1): connected
+2026-02-15T09:35:47.465425+08:00 yarten-Dell-G16-7630 /usr/libexec/gdm-x-session[1883]: (--) NVIDIA(GPU-0): BOE Technology Group Co., Ltd (DFP-1): Internal DisplayPort
+2026-02-15T09:35:47.465443+08:00 yarten-Dell-G16-7630 /usr/libexec/gdm-x-session[1883]: (--) NVIDIA(GPU-0): BOE Technology Group Co., Ltd (DFP-1): 2670.0 MHz maximum pixel clock
+2026-02-15T09:35:47.465459+08:00 yarten-Dell-G16-7630 /usr/libexec/gdm-x-session[1883]: (--) NVIDIA(GPU-0):
+2026-02-15T09:35:47.474900+08:00 yarten-Dell-G16-7630 kernel: [   11.912106] Initializing XFRM netlink socket
+2026-02-15T09:35:47.489893+08:00 yarten-Dell-G16-7630 kernel: [   11.926631] bridge: filtering via arp/ip/ip6tables is no longer available by default. Update your scripts to load br_netfilter if you need this.
+2026-02-15T09:35:47.490027+08:00 yarten-Dell-G16-7630 systemd-udevd[582]: Using default interface naming scheme 'v249'.
+2026-02-15T09:35:47.490274+08:00 yarten-Dell-G16-7630 NetworkManager[927]: <info>  [1771119347.4902] manager: (docker0): new Bridge device (/org/freedesktop/NetworkManager/Devices/5)
+2026-02-15T09:35:47.538686+08:00 yarten-Dell-G16-7630 avahi-daemon[921]: Joining mDNS multicast group on interface docker0.IPv4 with address 172.17.0.1.
+2026-02-15T09:35:47.538725+08:00 yarten-Dell-G16-7630 avahi-daemon[921]: New relevant interface docker0.IPv4 for mDNS.
+2026-02-15T09:35:47.538738+08:00 yarten-Dell-G16-7630 avahi-daemon[921]: Registering new address record for 172.17.0.1 on docker0.IPv4.
+2026-02-15T09:35:47.539470+08:00 yarten-Dell-G16-7630 NetworkManager[927]: <info>  [1771119347.5394] device (docker0): state change: unmanaged -> unavailable (reason 'connection-assumed', sys-iface-state: 'external')
+2026-02-15T09:35:47.539567+08:00 yarten-Dell-G16-7630 NetworkManager[927]: <info>  [1771119347.5395] device (docker0): state change: unavailable -> disconnected (reason 'connection-assumed', sys-iface-state: 'external')
+2026-02-15T09:35:47.539769+08:00 yarten-Dell-G16-7630 NetworkManager[927]: <info>  [1771119347.5397] device (docker0): Activation: starting connection 'docker0' (569f27cd-4b6f-4e09-9bce-db529f29abfd)
+2026-02-15T09:35:47.539823+08:00 yarten-Dell-G16-7630 NetworkManager[927]: <info>  [1771119347.5398] device (docker0): state change: disconnected -> prepare (reason 'none', sys-iface-state: 'external')
+2026-02-15T09:35:47.539896+08:00 yarten-Dell-G16-7630 NetworkManager[927]: <info>  [1771119347.5398] device (docker0): state change: prepare -> config (reason 'none', sys-iface-state: 'external')
+2026-02-15T09:35:47.539942+08:00 yarten-Dell-G16-7630 NetworkManager[927]: <info>  [1771119347.5399] device (docker0): state change: config -> ip-config (reason 'none', sys-iface-state: 'external')
+2026-02-15T09:35:47.539994+08:00 yarten-Dell-G16-7630 NetworkManager[927]: <info>  [1771119347.5399] device (docker0): state change: ip-config -> ip-check (reason 'none', sys-iface-state: 'external')
+2026-02-15T09:35:47.540998+08:00 yarten-Dell-G16-7630 NetworkManager[927]: <info>  [1771119347.5409] device (docker0): state change: ip-check -> secondaries (reason 'none', sys-iface-state: 'external')
+2026-02-15T09:35:47.541038+08:00 yarten-Dell-G16-7630 NetworkManager[927]: <info>  [1771119347.5410] device (docker0): state change: secondaries -> activated (reason 'none', sys-iface-state: 'external')
+2026-02-15T09:35:47.541170+08:00 yarten-Dell-G16-7630 NetworkManager[927]: <info>  [1771119347.5411] device (docker0): Activation: successful, device activated.
+2026-02-15T09:35:47.672072+08:00 yarten-Dell-G16-7630 dbus-daemon[925]: [system] Activating via systemd: service name='net.reactivated.Fprint' unit='fprintd.service' requested by ':1.46' (uid=128 pid=2050 comm="/usr/bin/gnome-shell " label="unconfined")
+2026-02-15T09:35:47.689279+08:00 yarten-Dell-G16-7630 systemd[1]: Starting Fingerprint Authentication Daemon...
+2026-02-15T09:35:47.717221+08:00 yarten-Dell-G16-7630 dockerd[2170]: time="2026-02-15T09:35:47.717185458+08:00" level=info msg="Default bridge (docker0) is assigned with an IP address 172.17.0.0/16. Daemon option --bip can be used to set a preferred IP address"
+2026-02-15T09:35:47.727808+08:00 yarten-Dell-G16-7630 dbus-daemon[925]: [system] Successfully activated service 'net.reactivated.Fprint'
+2026-02-15T09:35:47.727910+08:00 yarten-Dell-G16-7630 systemd[1]: Started Fingerprint Authentication Daemon.
+2026-02-15T09:35:47.731164+08:00 yarten-Dell-G16-7630 gnome-shell[2050]: JS ERROR: Failed to initialize fprintd service: Gio.IOErrorEnum: GDBus.Error:net.reactivated.Fprint.Error.NoSuchDevice: No devices available#012asyncCallback@resource:///org/gnome/gjs/modules/core/overrides/Gio.js:114:23
+2026-02-15T09:35:47.849348+08:00 yarten-Dell-G16-7630 dockerd[2170]: time="2026-02-15T09:35:47.849145032+08:00" level=warning msg="error locating sandbox id 5d20ebacd87f66bed32b9f46c940a56a7b2c32ddad47dc308b987f811568a920: sandbox 5d20ebacd87f66bed32b9f46c940a56a7b2c32ddad47dc308b987f811568a920 not found"
+2026-02-15T09:35:47.849583+08:00 yarten-Dell-G16-7630 dockerd[2170]: time="2026-02-15T09:35:47.849520929+08:00" level=info msg="Loading containers: done."
+2026-02-15T09:35:47.867081+08:00 yarten-Dell-G16-7630 dockerd[2170]: time="2026-02-15T09:35:47.866967811+08:00" level=info msg="Docker daemon" commit=c710b88 containerd-snapshotter=false storage-driver=overlay2 version=27.4.1
+2026-02-15T09:35:47.867224+08:00 yarten-Dell-G16-7630 dockerd[2170]: time="2026-02-15T09:35:47.867173496+08:00" level=info msg="Daemon has completed initialization"
+2026-02-15T09:35:47.907990+08:00 yarten-Dell-G16-7630 dockerd[2170]: time="2026-02-15T09:35:47.907794179+08:00" level=info msg="API listen on /run/docker.sock"
+2026-02-15T09:35:47.908102+08:00 yarten-Dell-G16-7630 systemd[1]: Started Docker Application Container Engine.
+2026-02-15T09:35:48.185297+08:00 yarten-Dell-G16-7630 gnome-shell[2050]: Registering session with GDM
+2026-02-15T09:35:48.205401+08:00 yarten-Dell-G16-7630 systemd[1]: Received SIGRTMIN+21 from PID 601 (plymouthd).
+2026-02-15T09:35:48.217500+08:00 yarten-Dell-G16-7630 systemd[1]: Finished Hold until boot process finishes up.
+2026-02-15T09:35:48.217907+08:00 yarten-Dell-G16-7630 systemd[1]: Reached target Multi-User System.
+2026-02-15T09:35:48.218093+08:00 yarten-Dell-G16-7630 systemd[1]: Reached target Graphical Interface.
+2026-02-15T09:35:48.236396+08:00 yarten-Dell-G16-7630 systemd[1]: Starting Set console scheme...
+2026-02-15T09:35:48.237728+08:00 yarten-Dell-G16-7630 systemd[1]: Starting Record Runlevel Change in UTMP...
+2026-02-15T09:35:48.238745+08:00 yarten-Dell-G16-7630 systemd[1]: Finished Set console scheme.
+2026-02-15T09:35:48.239472+08:00 yarten-Dell-G16-7630 systemd[1]: Created slice Slice /system/getty.
+2026-02-15T09:35:48.242266+08:00 yarten-Dell-G16-7630 systemd[1]: systemd-update-utmp-runlevel.service: Deactivated successfully.
+2026-02-15T09:35:48.242434+08:00 yarten-Dell-G16-7630 systemd[1]: Finished Record Runlevel Change in UTMP.
+2026-02-15T09:35:57.556148+08:00 yarten-Dell-G16-7630 systemd[1]: NetworkManager-dispatcher.service: Deactivated successfully.
+2026-02-15T09:36:08.959016+08:00 yarten-Dell-G16-7630 systemd[1]: systemd-fsckd.service: Deactivated successfully.
+2026-02-15T09:36:09.918006+08:00 yarten-Dell-G16-7630 systemd-timesyncd[842]: Initial synchronization to time server 185.125.190.58:123 (ntp.ubuntu.com).
+2026-02-15T09:36:17.213923+08:00 yarten-Dell-G16-7630 systemd[1]: systemd-localed.service: Deactivated successfully.
+2026-02-15T09:36:17.230379+08:00 yarten-Dell-G16-7630 systemd[1]: systemd-hostnamed.service: Deactivated successfully.
+2026-02-15T09:36:17.581859+08:00 yarten-Dell-G16-7630 systemd[1]: fprintd.service: Deactivated successfully.
+2026-02-15T09:36:26.932847+08:00 yarten-Dell-G16-7630 systemd[1]: systemd-timedated.service: Deactivated successfully.
+2026-02-15T09:36:36.854683+08:00 yarten-Dell-G16-7630 dbus-daemon[925]: [system] Activating via systemd: service name='net.reactivated.Fprint' unit='fprintd.service' requested by ':1.46' (uid=128 pid=2050 comm="/usr/bin/gnome-shell " label="unconfined")
+2026-02-15T09:36:36.870428+08:00 yarten-Dell-G16-7630 systemd[1]: Starting Fingerprint Authentication Daemon...
+2026-02-15T09:36:36.919741+08:00 yarten-Dell-G16-7630 dbus-daemon[925]: [system] Successfully activated service 'net.reactivated.Fprint'
+2026-02-15T09:36:36.919793+08:00 yarten-Dell-G16-7630 systemd[1]: Started Fingerprint Authentication Daemon.
+2026-02-15T09:36:38.892759+08:00 yarten-Dell-G16-7630 systemd[1]: Created slice User Slice of UID 1000.
+2026-02-15T09:36:38.906392+08:00 yarten-Dell-G16-7630 systemd[1]: Starting User Runtime Directory /run/user/1000...
+2026-02-15T09:36:38.913978+08:00 yarten-Dell-G16-7630 systemd[1]: Finished User Runtime Directory /run/user/1000.
+2026-02-15T09:36:38.915184+08:00 yarten-Dell-G16-7630 systemd[1]: Starting User Manager for UID 1000...
+2026-02-15T09:36:38.991645+08:00 yarten-Dell-G16-7630 systemd[2603]: Queued start job for default target Main User Target.
+2026-02-15T09:36:39.023210+08:00 yarten-Dell-G16-7630 rtkit-daemon[1889]: Supervising 10 threads of 3 processes of 1 users.
+2026-02-15T09:36:39.023265+08:00 yarten-Dell-G16-7630 systemd[2603]: Created slice User Application Slice.
+2026-02-15T09:36:39.026676+08:00 yarten-Dell-G16-7630 systemd[2603]: Created slice User Core Session Slice.
+2026-02-15T09:36:39.026808+08:00 yarten-Dell-G16-7630 systemd[2603]: Started Pending report trigger for Ubuntu Report.
+2026-02-15T09:36:39.027382+08:00 yarten-Dell-G16-7630 dockerd-rootless.sh[2610]: + [ -w /run/user/1000 ]
+2026-02-15T09:36:39.029282+08:00 yarten-Dell-G16-7630 dockerd-rootless.sh[2610]: + [ -d /home/yarten ]
+2026-02-15T09:36:39.029309+08:00 yarten-Dell-G16-7630 dockerd-rootless.sh[2610]: + rootlesskit=
+2026-02-15T09:36:39.029329+08:00 yarten-Dell-G16-7630 dockerd-rootless.sh[2610]: + command -v docker-rootlesskit
+2026-02-15T09:36:39.029652+08:00 yarten-Dell-G16-7630 dockerd-rootless.sh[2610]: + command -v rootlesskit
+2026-02-15T09:36:39.029677+08:00 yarten-Dell-G16-7630 dockerd-rootless.sh[2610]: + rootlesskit=rootlesskit
+2026-02-15T09:36:39.029699+08:00 yarten-Dell-G16-7630 dockerd-rootless.sh[2610]: + break
+2026-02-15T09:36:39.029720+08:00 yarten-Dell-G16-7630 dockerd-rootless.sh[2610]: + [ -z rootlesskit ]
+2026-02-15T09:36:39.029739+08:00 yarten-Dell-G16-7630 dockerd-rootless.sh[2610]: + : /run/user/1000/dockerd-rootless
+2026-02-15T09:36:39.029762+08:00 yarten-Dell-G16-7630 dockerd-rootless.sh[2610]: + :
+2026-02-15T09:36:39.029782+08:00 yarten-Dell-G16-7630 dockerd-rootless.sh[2610]: + :
+2026-02-15T09:36:39.029801+08:00 yarten-Dell-G16-7630 dockerd-rootless.sh[2610]: + : builtin
+2026-02-15T09:36:39.029824+08:00 yarten-Dell-G16-7630 dockerd-rootless.sh[2610]: + : auto
+2026-02-15T09:36:39.029846+08:00 yarten-Dell-G16-7630 dockerd-rootless.sh[2610]: + : auto
+2026-02-15T09:36:39.029867+08:00 yarten-Dell-G16-7630 dockerd-rootless.sh[2610]: + :
+2026-02-15T09:36:39.029888+08:00 yarten-Dell-G16-7630 dockerd-rootless.sh[2610]: + net=
+2026-02-15T09:36:39.029913+08:00 yarten-Dell-G16-7630 dockerd-rootless.sh[2610]: + mtu=
+2026-02-15T09:36:39.029934+08:00 yarten-Dell-G16-7630 dockerd-rootless.sh[2610]: + [ -z  ]
+2026-02-15T09:36:39.029955+08:00 yarten-Dell-G16-7630 dockerd-rootless.sh[2610]: + command -v slirp4netns
+2026-02-15T09:36:39.030026+08:00 yarten-Dell-G16-7630 systemd[2603]: Reached target Paths.
+2026-02-15T09:36:39.030351+08:00 yarten-Dell-G16-7630 rtkit-daemon[1889]: Successfully made thread 2611 of process 2611 owned by '1000' high priority at nice level -11.
+2026-02-15T09:36:39.030449+08:00 yarten-Dell-G16-7630 systemd[2603]: Reached target Timers.
+2026-02-15T09:36:39.030726+08:00 yarten-Dell-G16-7630 rtkit-daemon[1889]: Supervising 11 threads of 4 processes of 2 users.
+2026-02-15T09:36:39.030784+08:00 yarten-Dell-G16-7630 dockerd-rootless.sh[2615]: +
+2026-02-15T09:36:39.030864+08:00 yarten-Dell-G16-7630 systemd[2603]: Starting D-Bus User Message Bus Socket...
+2026-02-15T09:36:39.031827+08:00 yarten-Dell-G16-7630 rtkit-daemon[1889]: Supervising 11 threads of 4 processes of 2 users.
+2026-02-15T09:36:39.031877+08:00 yarten-Dell-G16-7630 dockerd-rootless.sh[2614]: +
+2026-02-15T09:36:39.031952+08:00 yarten-Dell-G16-7630 systemd[2603]: Listening on GnuPG network certificate management daemon.
+2026-02-15T09:36:39.032355+08:00 yarten-Dell-G16-7630 dockerd-rootless.sh[2615]: grep -qw
+2026-02-15T09:36:39.032420+08:00 yarten-Dell-G16-7630 systemd[2603]: Listening on GnuPG cryptographic agent and passphrase cache (access for web browsers).
+2026-02-15T09:36:39.032473+08:00 yarten-Dell-G16-7630 dockerd-rootless.sh[2614]: slirp4netns
+2026-02-15T09:36:39.032500+08:00 yarten-Dell-G16-7630 systemd[2603]: Listening on GnuPG cryptographic agent and passphrase cache (restricted).
+2026-02-15T09:36:39.032539+08:00 yarten-Dell-G16-7630 dockerd-rootless.sh[2615]:  --
+2026-02-15T09:36:39.032566+08:00 yarten-Dell-G16-7630 systemd[2603]: Listening on GnuPG cryptographic agent (ssh-agent emulation).
+2026-02-15T09:36:39.032603+08:00 yarten-Dell-G16-7630 dockerd-rootless.sh[2614]:  --help
+2026-02-15T09:36:39.032625+08:00 yarten-Dell-G16-7630 systemd[2603]: Listening on GnuPG cryptographic agent and passphrase cache.
+2026-02-15T09:36:39.032829+08:00 yarten-Dell-G16-7630 dockerd-rootless.sh[2615]:  --netns-type
+2026-02-15T09:36:39.032853+08:00 yarten-Dell-G16-7630 systemd[2603]: Listening on PipeWire Multimedia System Socket.
+2026-02-15T09:36:39.032900+08:00 yarten-Dell-G16-7630 systemd[2603]: Listening on debconf communication socket.
+2026-02-15T09:36:39.033001+08:00 yarten-Dell-G16-7630 dockerd-rootless.sh[2610]: + net=slirp4netns
+2026-02-15T09:36:39.033051+08:00 yarten-Dell-G16-7630 dockerd-rootless.sh[2610]: + [ -z  ]
+2026-02-15T09:36:39.033071+08:00 yarten-Dell-G16-7630 dockerd-rootless.sh[2610]: + mtu=65520
+2026-02-15T09:36:39.033090+08:00 yarten-Dell-G16-7630 dockerd-rootless.sh[2610]: + [ -z slirp4netns ]
+2026-02-15T09:36:39.033112+08:00 yarten-Dell-G16-7630 dockerd-rootless.sh[2610]: + [ -z 65520 ]
+2026-02-15T09:36:39.033136+08:00 yarten-Dell-G16-7630 dockerd-rootless.sh[2610]: + host_loopback=--disable-host-loopback
+2026-02-15T09:36:39.033158+08:00 yarten-Dell-G16-7630 dockerd-rootless.sh[2610]: + [  = false ]
+2026-02-15T09:36:39.033179+08:00 yarten-Dell-G16-7630 dockerd-rootless.sh[2610]: + dockerd=dockerd
+2026-02-15T09:36:39.033198+08:00 yarten-Dell-G16-7630 dockerd-rootless.sh[2610]: + [ -z  ]
+2026-02-15T09:36:39.033216+08:00 yarten-Dell-G16-7630 dockerd-rootless.sh[2610]: + _DOCKERD_ROOTLESS_CHILD=1
+2026-02-15T09:36:39.033237+08:00 yarten-Dell-G16-7630 dockerd-rootless.sh[2610]: + export _DOCKERD_ROOTLESS_CHILD
+2026-02-15T09:36:39.033263+08:00 yarten-Dell-G16-7630 systemd[2603]: Listening on Sound System.
+2026-02-15T09:36:39.033345+08:00 yarten-Dell-G16-7630 dockerd-rootless.sh[2617]: + id -u
+2026-02-15T09:36:39.033372+08:00 yarten-Dell-G16-7630 systemd[2603]: Listening on REST API socket for snapd user session agent.
+2026-02-15T09:36:39.033420+08:00 yarten-Dell-G16-7630 dockerd-rootless.sh[2610]: + [ 1000 = 0 ]
+2026-02-15T09:36:39.033440+08:00 yarten-Dell-G16-7630 dockerd-rootless.sh[2610]: + command -v selinuxenabled
+2026-02-15T09:36:39.033598+08:00 yarten-Dell-G16-7630 dockerd-rootless.sh[2610]: + exec rootlesskit --state-dir=/run/user/1000/dockerd-rootless --net=slirp4netns --mtu=65520 --slirp4netns-sandbox=auto --slirp4netns-seccomp=auto --disable-host-loopback --port-driver=builtin --copy-up=/etc --copy-up=/run --propagation=rslave /usr/bin/dockerd-rootless.sh
+2026-02-15T09:36:39.033626+08:00 yarten-Dell-G16-7630 systemd[2603]: Listening on Speech Dispatcher Socket.
+2026-02-15T09:36:39.033928+08:00 yarten-Dell-G16-7630 systemd[2603]: Listening on D-Bus User Message Bus Socket.
+2026-02-15T09:36:39.033962+08:00 yarten-Dell-G16-7630 systemd[2603]: Reached target Sockets.
+2026-02-15T09:36:39.034003+08:00 yarten-Dell-G16-7630 systemd[2603]: Reached target Basic System.
+2026-02-15T09:36:39.034042+08:00 yarten-Dell-G16-7630 systemd[2603]: docker.service: unit configures an IP firewall, but not running as root.
+2026-02-15T09:36:39.034735+08:00 yarten-Dell-G16-7630 systemd[2603]: (This warning is only shown for the first unit using IP firewalling.)
+2026-02-15T09:36:39.034769+08:00 yarten-Dell-G16-7630 systemd[1]: Started User Manager for UID 1000.
+2026-02-15T09:36:39.034818+08:00 yarten-Dell-G16-7630 systemd[2603]: Starting Docker Application Container Engine (Rootless)...
+2026-02-15T09:36:39.034857+08:00 yarten-Dell-G16-7630 systemd[1]: Started Session 2 of User yarten.
+2026-02-15T09:36:39.034904+08:00 yarten-Dell-G16-7630 systemd[2603]: Started PipeWire Multimedia Service.
+2026-02-15T09:36:39.034943+08:00 yarten-Dell-G16-7630 systemd[2603]: Started PipeWire Media Session Manager.
+2026-02-15T09:36:39.035260+08:00 yarten-Dell-G16-7630 systemd[2603]: Starting Sound Service...
+2026-02-15T09:36:39.035298+08:00 yarten-Dell-G16-7630 systemd[2603]: Started Service for snap application snapd-desktop-integration.snapd-desktop-integration.
+2026-02-15T09:36:39.044263+08:00 yarten-Dell-G16-7630 rtkit-daemon[1889]: Successfully made thread 2613 of process 2613 owned by '1000' high priority at nice level -11.
+2026-02-15T09:36:39.044329+08:00 yarten-Dell-G16-7630 rtkit-daemon[1889]: Supervising 12 threads of 5 processes of 2 users.
+2026-02-15T09:36:39.044376+08:00 yarten-Dell-G16-7630 rtkit-daemon[1889]: Supervising 12 threads of 5 processes of 2 users.
+2026-02-15T09:36:39.045215+08:00 yarten-Dell-G16-7630 rtkit-daemon[1889]: Successfully made thread 2625 of process 2612 owned by '1000' RT at priority 20.
+2026-02-15T09:36:39.045246+08:00 yarten-Dell-G16-7630 rtkit-daemon[1889]: Supervising 13 threads of 6 processes of 2 users.
+2026-02-15T09:36:39.049091+08:00 yarten-Dell-G16-7630 systemd[2603]: Started D-Bus User Message Bus.
+2026-02-15T09:36:39.050837+08:00 yarten-Dell-G16-7630 dbus-daemon[2670]: [session uid=1000 pid=2670] AppArmor D-Bus mediation is enabled
+2026-02-15T09:36:39.051629+08:00 yarten-Dell-G16-7630 dbus-daemon[2670]: [session uid=1000 pid=2670] Activating via systemd: service name='org.freedesktop.portal.Documents' unit='xdg-document-portal.service' requested by ':1.3' (uid=1000 pid=2616 comm="/usr/bin/snap run snapd-desktop-integration " label="unconfined")
+2026-02-15T09:36:39.051772+08:00 yarten-Dell-G16-7630 rtkit-daemon[1889]: Supervising 13 threads of 6 processes of 2 users.
+2026-02-15T09:36:39.051860+08:00 yarten-Dell-G16-7630 systemd[2603]: Starting flatpak document portal service...
+2026-02-15T09:36:39.052837+08:00 yarten-Dell-G16-7630 rtkit-daemon[1889]: Successfully made thread 2680 of process 2611 owned by '1000' RT at priority 20.
+2026-02-15T09:36:39.052875+08:00 yarten-Dell-G16-7630 rtkit-daemon[1889]: Supervising 14 threads of 6 processes of 2 users.
+2026-02-15T09:36:39.054611+08:00 yarten-Dell-G16-7630 dockerd-rootless.sh[2684]: + [ -w /run/user/1000 ]
+2026-02-15T09:36:39.054698+08:00 yarten-Dell-G16-7630 dockerd-rootless.sh[2684]: + [ -d /home/yarten ]
+2026-02-15T09:36:39.054722+08:00 yarten-Dell-G16-7630 dockerd-rootless.sh[2684]: + rootlesskit=
+2026-02-15T09:36:39.054744+08:00 yarten-Dell-G16-7630 dockerd-rootless.sh[2684]: + command -v docker-rootlesskit
+2026-02-15T09:36:39.054764+08:00 yarten-Dell-G16-7630 dockerd-rootless.sh[2684]: + command -v rootlesskit
+2026-02-15T09:36:39.054783+08:00 yarten-Dell-G16-7630 dockerd-rootless.sh[2684]: + rootlesskit=rootlesskit
+2026-02-15T09:36:39.054807+08:00 yarten-Dell-G16-7630 dockerd-rootless.sh[2684]: + break
+2026-02-15T09:36:39.054830+08:00 yarten-Dell-G16-7630 dockerd-rootless.sh[2684]: + [ -z rootlesskit ]
+2026-02-15T09:36:39.054853+08:00 yarten-Dell-G16-7630 dockerd-rootless.sh[2684]: + : /run/user/1000/dockerd-rootless
+2026-02-15T09:36:39.054873+08:00 yarten-Dell-G16-7630 dockerd-rootless.sh[2684]: + :
+2026-02-15T09:36:39.054898+08:00 yarten-Dell-G16-7630 dockerd-rootless.sh[2684]: + :
+2026-02-15T09:36:39.054918+08:00 yarten-Dell-G16-7630 dockerd-rootless.sh[2684]: + : builtin
+2026-02-15T09:36:39.054939+08:00 yarten-Dell-G16-7630 dockerd-rootless.sh[2684]: + : auto
+2026-02-15T09:36:39.054959+08:00 yarten-Dell-G16-7630 dockerd-rootless.sh[2684]: + : auto
+2026-02-15T09:36:39.054979+08:00 yarten-Dell-G16-7630 dockerd-rootless.sh[2684]: + :
