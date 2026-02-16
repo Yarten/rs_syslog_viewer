@@ -72,7 +72,8 @@ impl KeyEventEx for KeyEvent {
     match (self.code, other.code) {
       // 对于字母键来说，我们希望忽略大小写进行比较。另外，为了避免歧义，对比字母键时需要去掉 shift
       (KeyCode::Char(c1), KeyCode::Char(c2))
-        if c1.is_ascii_alphabetic() && c2.is_ascii_alphabetic() && c1.eq_ignore_ascii_case(&c2) => {
+        if c1.is_ascii_alphabetic() && c2.is_ascii_alphabetic() && c1.eq_ignore_ascii_case(&c2) =>
+      {
         // 如果字母键相同，那么在去掉了 shift 的基础上，对比额外的修饰键是否相同
         let mut m1 = self.modifiers;
         m1.remove(KeyModifiers::SHIFT);

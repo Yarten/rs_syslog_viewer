@@ -1,4 +1,3 @@
-use log::log;
 use rs_syslog_viewer::log::{DataBoard, Event, LogFile, LogLine};
 use std::collections::{BTreeSet, HashSet};
 use std::sync::Arc;

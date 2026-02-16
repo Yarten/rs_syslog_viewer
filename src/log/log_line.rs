@@ -1,7 +1,9 @@
 //! 描述一条、也即一行的系统日志，并维护相关操作状态
 
+use crate::log::LogLine::{Bad, Good};
 use chrono::{DateTime, Datelike, FixedOffset, Local, NaiveDateTime};
 use lazy_static::lazy_static;
+use std::cmp::Ordering;
 
 /// 日志内容标签
 #[derive(PartialEq, Debug, Clone)]
@@ -226,6 +228,30 @@ impl<'a> BytesSeeker<'a> {
 
   fn rest_of_all(self) -> &'a [u8] {
     self.bytes
+  }
+}
+
+impl LogLine {
+  /// 比较两个日志，如果左边日志旧于右边日志，返回 Less，
+  /// 如果日志中有坏行，总是认为该坏行是更旧的（早点让它出现，否则它可能会饿死下一条正常日志）
+  pub fn is_older(lhs: &LogLine, rhs: &LogLine) -> Ordering {
+    match (lhs, rhs) {
+      (Good(lhs), Good(rhs)) => lhs.timestamp.cmp(&rhs.timestamp),
+      (Good(_), Bad(_)) => Ordering::Greater,
+      (Bad(_), Good(_)) => Ordering::Less,
+      (Bad(_), Bad(_)) => Ordering::Less,
+    }
+  }
+
+  /// 比较两个日志，如果左边日志新于右边日志，返回 Less，
+  /// 如果日志中有坏行，总是认为该坏行是更新的（早点让它出现，否则它可能会饿死下一条正常日志）
+  pub fn is_newer(lhs: &LogLine, rhs: &LogLine) -> Ordering {
+    match (lhs, rhs) {
+      (Good(lhs), Good(rhs)) => lhs.timestamp.cmp(&rhs.timestamp).reverse(),
+      (Good(_), Bad(_)) => Ordering::Greater,
+      (Bad(_), Good(_)) => Ordering::Less,
+      (Bad(_), Bad(_)) => Ordering::Less,
+    }
   }
 }
 

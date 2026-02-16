@@ -20,12 +20,8 @@ fn postfix(log_path: &Path, n: i32) -> PathBuf {
 async fn test_rotated_log() {
   let log_path = common::get_test_log();
 
-  let true_content: Vec<LogLine> = common::read_file_as_lines(&postfix(&log_path, 2))
-    .into_iter()
-    .chain(common::read_file_as_lines(&postfix(&log_path, 1)).into_iter())
-    .chain(common::read_file_as_lines(&log_path).into_iter())
-    .map(|line| LogLine::new(line))
-    .collect();
+  let true_content: Vec<LogLine> =
+    common::read_all_files_as_lines(&common::get_test_root(), "test").unwrap();
   let true_reversed_content: Vec<LogLine> = true_content.iter().rev().cloned().collect();
   let true_tags: BTreeSet<String> = common::all_tags(&true_content);
 

@@ -1,10 +1,7 @@
 use color_eyre::Result;
 use crossterm::event::{self, KeyCode};
-use ratatui::{
-  DefaultTerminal,
-};
-use rs_syslog_viewer::ui::{Pager, DemoPage};
-
+use ratatui::DefaultTerminal;
+use rs_syslog_viewer::ui::{DemoPage, Pager};
 
 fn run(terminal: &mut DefaultTerminal, mut pager: Pager) -> Result<()> {
   let mut input_mode = false;

@@ -197,7 +197,6 @@ impl Pager {
   }
 }
 
-
 impl Pager {
   pub fn status(&mut self) -> &mut StatusBar {
     &mut self.status_bar

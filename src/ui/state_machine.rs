@@ -1,9 +1,6 @@
-use std::{
-  collections::HashMap,
-  time::Duration,
-};
-use crate::ui::{Pager, KeyEventEx};
-use crossterm::event::{KeyCode, KeyEvent, self, Event, KeyModifiers};
+use crate::ui::{KeyEventEx, Pager};
+use crossterm::event::{self, Event, KeyCode, KeyEvent, KeyModifiers};
+use std::{collections::HashMap, time::Duration};
 
 /// 在某个状态下，识别到指定按键事件后，执行的动作。不会引起状态切换
 type Action = Box<dyn FnMut(&mut Pager)>;
@@ -53,8 +50,8 @@ impl State {
       name: name.into(),
       input_mode: None,
       transitions: Vec::new(),
-      enter_action: Box::new(|_|{}),
-      leave_action: Box::new(|_|{}),
+      enter_action: Box::new(|_| {}),
+      leave_action: Box::new(|_| {}),
     }
   }
 
@@ -71,16 +68,12 @@ impl State {
   /// 设置一个简单的事件响应动作
   pub fn action<F>(self, event: KeyEvent, mut act: F) -> Self
   where
-    F: FnMut(&mut Pager) + 'static
+    F: FnMut(&mut Pager) + 'static,
   {
-    self.goto_action(
-      event,
-      0,
-      move |pager| {
-        act(pager);
-        false
-      },
-    )
+    self.goto_action(event, 0, move |pager| {
+      act(pager);
+      false
+    })
   }
 
   /// 设置一个状态跳转动作
@@ -91,7 +84,7 @@ impl State {
   /// 设置一个状态跳转动作，但跳转前先执行一个处理流程，返回 true 时进行跳转
   pub fn goto_action<F>(mut self, event: KeyEvent, next_state: usize, act: F) -> Self
   where
-    F: FnMut(&mut Pager) -> bool + 'static
+    F: FnMut(&mut Pager) -> bool + 'static,
   {
     self.transitions.push(Transition {
       event,
@@ -104,7 +97,7 @@ impl State {
   /// 设置进入状态时执行的动作
   pub fn enter_action<F>(mut self, act: F) -> Self
   where
-    F: FnMut(&mut Pager) + 'static
+    F: FnMut(&mut Pager) + 'static,
   {
     self.enter_action = Box::new(act);
     self
@@ -113,7 +106,7 @@ impl State {
   /// 设置离开状态时执行的动作
   pub fn leave_action<F>(mut self, act: F) -> Self
   where
-    F: FnMut(&mut Pager) + 'static
+    F: FnMut(&mut Pager) + 'static,
   {
     self.leave_action = Box::new(act);
     self
@@ -144,18 +137,22 @@ impl State {
   fn react(&mut self, pager: &mut Pager, event: KeyEvent) -> Option<usize> {
     // 处理 repeat 的情况，防止触发过快（一般也不会默认使能这个特性）
     if event.is_repeat() {
-      return None
+      return None;
     }
 
     // 优先处理输入的相关的事件
     if self.input_mode.is_some() && self.handle_input(pager, event) {
-      return None
+      return None;
     }
 
     // 从前往后逐一对比事件响应条件，命中第一个时进行处理
     for t in self.transitions.iter_mut() {
       if t.event.same_as(&event) {
-        return if (t.act)(pager) { Some(t.next_state) } else { None };
+        return if (t.act)(pager) {
+          Some(t.next_state)
+        } else {
+          None
+        };
       }
     }
 
@@ -174,7 +171,9 @@ impl State {
       KeyCode::Backspace => pager.status().delete_char(),
       KeyCode::Left => pager.status().move_cursor_left(),
       KeyCode::Right => pager.status().move_cursor_right(),
-      _ => { return false; }
+      _ => {
+        return false;
+      }
     }
 
     true
@@ -242,7 +241,7 @@ impl StateMachine {
 
           // 处理状态流转，程序继续运行
           event => self.manage_once(pager, event),
-        }
+        },
 
         // 非键盘事件，全部忽略，程序继续运行
         Ok(_) => {}
@@ -280,7 +279,8 @@ impl StateMachine {
   }
 
   fn get_current_state(&mut self) -> &mut State {
-    self.states
+    self
+      .states
       .get_mut(&self.curr_state_index)
       .expect(format!("cannot enter state {}", self.curr_state_index).as_str())
   }

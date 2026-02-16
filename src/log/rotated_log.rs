@@ -7,6 +7,7 @@ use crate::log::{
 use std::{collections::VecDeque, fs, path::PathBuf, sync::Arc};
 
 /// 索引某一个系统日志中的某一行
+#[derive(Copy, Clone, PartialEq, Eq)]
 pub struct Index {
   /// `RotatedLog` 中的日志文件数组的索引
   file_index: usize,
@@ -21,6 +22,10 @@ impl Index {
       file_index,
       line_index,
     }
+  }
+
+  pub fn zero() -> Self {
+    Self::new(0, LogFileIndex::zero())
   }
 }
 

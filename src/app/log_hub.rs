@@ -1,20 +1,16 @@
 use crate::log::{Config, DataBoard, Index as LogIndex, LogLine, RotatedLog};
-use std::{
-  collections::{HashMap, HashSet},
-  ops::Deref,
-  path::Path,
-  sync::Arc,
-};
+use std::ops::DerefMut;
+use std::{cmp::Ordering, collections::HashMap, ops::Deref, path::Path, sync::Arc};
 use tokio::task::{self, JoinHandle};
 use tokio_util::sync::CancellationToken;
 
 /// 所有日志文件的索引
-struct Index {
+pub struct Index {
   indexes: Vec<LogIndex>,
 }
 
 /// 若有的日志文件，支持内容的查找操作，以及标记操作，
-struct LogHubData {
+pub struct LogHubData {
   /// 所有的被跟踪的系统日志
   logs: Vec<RotatedLog>,
 
@@ -22,7 +18,7 @@ struct LogHubData {
   data_board: Arc<DataBoard>,
 }
 
-struct LogHub {
+pub struct LogHub {
   /// 数据内容，其中的内容不是总有效。
   /// 在通过 `data()` 函数获取操作接口之前，它们都在异步的流程中刷新自己的状态
   logs_data: LogHubData,
@@ -123,10 +119,12 @@ impl LogHub {
     data_board: Arc<DataBoard>,
     stop_token: CancellationToken,
   ) -> (usize, RotatedLog) {
-    loop {
-      tokio::select! {
-        _ = stop_token.cancelled() => break,
-        _ = log.update(data_board.clone()) => {}
+    if log.prepare().await {
+      loop {
+        tokio::select! {
+          _ = stop_token.cancelled() => break,
+          _ = log.update(data_board.clone()) => {}
+        }
       }
     }
 
@@ -135,7 +133,7 @@ impl LogHub {
 }
 
 /// 导出日志数据操作器，在声明周期结束时，自动开始异步的更新流程
-struct LogHubDataGuard<'a> {
+pub struct LogHubDataGuard<'a> {
   hub: &'a mut LogHub,
 }
 
@@ -147,8 +145,136 @@ impl<'a> Deref for LogHubDataGuard<'a> {
   }
 }
 
+impl<'a> DerefMut for LogHubDataGuard<'a> {
+  fn deref_mut(&mut self) -> &mut Self::Target {
+    &mut self.hub.logs_data
+  }
+}
+
 impl Drop for LogHubDataGuard<'_> {
   fn drop(&mut self) {
     self.hub.spawn_updating();
+  }
+}
+
+/// 同时处理所有系统日志的向量迭代器
+pub struct Iter<'a, I, F>
+where
+  I: Iterator<Item = (LogIndex, &'a LogLine)>,
+  F: Fn(&LogLine, &LogLine) -> Ordering,
+{
+  iters: Vec<(I, Option<(LogIndex, &'a LogLine)>)>,
+  cmp: F,
+}
+
+impl<'a, I, F> Iterator for Iter<'a, I, F>
+where
+  I: Iterator<Item = (LogIndex, &'a LogLine)>,
+  F: Fn(&LogLine, &LogLine) -> Ordering,
+{
+  type Item = (Index, &'a LogLine);
+
+  fn next(&mut self) -> Option<Self::Item> {
+    // 所有日志的索引向量
+    let mut index = Index {
+      indexes: Vec::with_capacity(self.iters.len()),
+    };
+
+    // 记录极值元素
+    let mut min_elem: Option<(usize, &'a LogLine)> = None;
+
+    // 找到所有日志中的极值
+    for (nth, (i, elem)) in self.iters.iter_mut().enumerate() {
+      if elem.is_none() {
+        *elem = i.next();
+      }
+
+      if let Some((idx, log)) = elem {
+        index.indexes.push(*idx);
+
+        if match min_elem {
+          None => true,
+          Some((_, min_log)) => (self.cmp)(log, min_log) == Ordering::Less,
+        } {
+          min_elem = Some((nth, log))
+        }
+      } else {
+        index.indexes.push(LogIndex::zero());
+      }
+    }
+
+    // 若找到了极值，则需要将其取到的数据记录清掉，以便于下一个周期取新的进行比较
+    if let Some((nth, min_log)) = min_elem {
+      self.iters[nth].1 = None;
+      Some((index, min_log))
+    } else {
+      None
+    }
+  }
+}
+
+impl LogHubData {
+  /// 获取从指定索引处，开始正向遍历的迭代器
+  pub fn iter_forward_from(&'_ self, index: Index) -> impl Iterator<Item = (Index, &'_ LogLine)> {
+    Iter {
+      iters: index
+        .indexes
+        .iter()
+        .enumerate()
+        .map(|(nth, idx)| (self.logs[nth].iter_forward_from(*idx), None))
+        .collect(),
+      cmp: LogLine::is_older,
+    }
+  }
+
+  /// 获取从指定索引处，开始逆向遍历的迭代器
+  pub fn iter_backward_from(&'_ self, index: Index) -> impl Iterator<Item = (Index, &'_ LogLine)> {
+    Iter {
+      iters: index
+        .indexes
+        .iter()
+        .enumerate()
+        .map(|(nth, idx)| (self.logs[nth].iter_backward_from(*idx), None))
+        .collect(),
+      cmp: LogLine::is_newer,
+    }
+  }
+
+  /// 获取从第一条日志开始正向遍历的迭代器
+  pub fn iter_forward_from_head(&'_ self) -> impl Iterator<Item = (Index, &'_ LogLine)> {
+    self.iter_forward_from(self.first_index())
+  }
+
+  /// 获取从最后一条日志开始逆向遍历的迭代器
+  pub fn iter_backward_from_tail(&'_ self) -> impl Iterator<Item = (Index, &'_ LogLine)> {
+    self.iter_backward_from(self.last_index())
+  }
+
+  /// 获取指向首条日志的索引
+  pub fn first_index(&self) -> Index {
+    Index {
+      indexes: self.logs.iter().map(|log| log.first_index()).collect(),
+    }
+  }
+
+  /// 获取最新的日志索引（也即最后一个日志的索引）
+  pub fn last_index(&self) -> Index {
+    Index {
+      indexes: self.logs.iter().map(|log| log.last_index()).collect(),
+    }
+  }
+
+  /// 尝试加载更旧的日志。将会从给定的日志索引中，找到已经顶到头的那些，
+  /// 要求它们进行加载。
+  pub fn try_load_older_logs(&mut self, index: Index) {
+    index
+      .indexes
+      .iter()
+      .zip(self.logs.iter_mut())
+      .for_each(|(idx, log)| {
+        if idx == &log.first_index() {
+          log.set_want_older_log();
+        }
+      });
   }
 }
