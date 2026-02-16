@@ -24,6 +24,19 @@ impl Index {
   }
 }
 
+/// 日志文件的配置
+pub struct Config {
+  possible_max_rotated_count: usize,
+}
+
+impl Config {
+  pub fn default() -> Self {
+    Self {
+      possible_max_rotated_count: 5,
+    }
+  }
+}
+
 /// 维护一组由 syslog 滚动的系统日志，
 /// 这些日志是按需加载的，但总是从最新的一份开始
 pub struct RotatedLog {
@@ -40,10 +53,10 @@ pub struct RotatedLog {
 impl RotatedLog {
   /// 创建新的一组系统日志文件维护实例，给定的 `path` 参数是未带回滚后缀的路径，
   /// 本类会自动在相同目录下，扫描它的被滚动的其他日志。
-  pub fn new(path: PathBuf, possible_max_rotated_count: usize) -> Self {
+  pub fn new(path: PathBuf, config: Config) -> Self {
     Self {
       path,
-      log_files: VecDeque::with_capacity(possible_max_rotated_count),
+      log_files: VecDeque::with_capacity(config.possible_max_rotated_count),
       want_older_log: false,
     }
   }

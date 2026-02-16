@@ -2,6 +2,7 @@
 name = "rs_syslog_viewer"
 version = "0.1.0"
 edition = "2024"
+rust-version = "1.92.0"
 
 [dependencies]
 tokio = { version = "1.48.0", features = ["full"] }
@@ -13,3 +14,6 @@ lazy_static = "1.5.0"
 enum_dispatch = "0.3.13"
 futures = "0.3.31"
 log = "0.4.29"
+ratatui = "0.30.0"
+crossterm = "0.29.0"
+color-eyre = "0.6.5"

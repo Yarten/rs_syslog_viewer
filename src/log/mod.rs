@@ -9,4 +9,4 @@ pub use data_board::DataBoard;
 pub use event::Event;
 pub use log_file::LogFile;
 pub use log_line::{BrokenLogLine, LogLine, NormalLogLine};
-pub use rotated_log::RotatedLog;
+pub use rotated_log::{Config, Index, RotatedLog};

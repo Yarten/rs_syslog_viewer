@@ -1,4 +1,4 @@
-use rs_syslog_viewer::log::{DataBoard, LogLine, RotatedLog};
+use rs_syslog_viewer::log::{Config, DataBoard, LogLine, RotatedLog};
 use std::collections::BTreeSet;
 use std::path::{Path, PathBuf};
 use std::sync::Arc;
@@ -30,7 +30,7 @@ async fn test_rotated_log() {
   let true_tags: BTreeSet<String> = common::all_tags(&true_content);
 
   let data_board = Arc::new(DataBoard::default());
-  let mut log = RotatedLog::new(log_path.clone(), 5);
+  let mut log = RotatedLog::new(log_path.clone(), Config::default());
 
   let start = Instant::now();
 
@@ -47,8 +47,9 @@ async fn test_rotated_log() {
 
   let content: Vec<LogLine> = common::collect_lines(log.iter_forward_from_head());
   let reversed_content: Vec<LogLine> = common::collect_lines(log.iter_backward_from_tail());
+  let tags: BTreeSet<String> = data_board.get_tags().keys().cloned().collect();
 
   assert_eq!(&content, &true_content);
   assert_eq!(&reversed_content, &true_reversed_content);
-  assert_eq!(&*data_board.get_tags(), &true_tags);
+  assert_eq!(&tags, &true_tags);
 }
