@@ -92,13 +92,6 @@ impl Chunk {
     }
   }
 
-  /// 获取最早的日志时间点（如果日志全都是损坏的，或者没有日志记录，则返回 None）
-  /// 由于系统日志的时间来自当时的系统事件，而系统时间可能由于 RTC 或 PTP 的因素，
-  /// 导致时间值准确的，因此无法假定 first time 一定小于 last time
-  fn first_time(&self) -> Option<DateTime<FixedOffset>> {
-    todo!()
-  }
-
   /// 给定逻辑上的数据索引，获取真实的数据索引
   fn get_real_index(&self, i: usize) -> usize {
     if self.reversed {

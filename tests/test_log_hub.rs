@@ -33,10 +33,20 @@ async fn test_log_hub() {
     data.try_load_older_logs(first_index);
   }
 
-  let data = log_hub.data().await;
+  let mut data = log_hub.data().await;
   let content: Vec<LogLine> = common::collect_lines(data.iter_forward_from_head());
   let reversed_content: Vec<LogLine> = common::collect_lines(data.iter_backward_from_tail());
 
   assert_eq!(&content, &true_content);
   assert_eq!(&reversed_content, &true_reversed_content);
+
+  // 测试可变的迭代器接口
+  for (_, log) in data.iter_mut_forward_from_head() {
+    log.toggle_mark();
+  }
+  for log in true_content.iter_mut() {
+    log.toggle_mark();
+  }
+  let content: Vec<LogLine> = common::collect_lines(data.iter_forward_from_head());
+  assert_eq!(&content, &true_content);
 }

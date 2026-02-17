@@ -253,6 +253,14 @@ impl LogLine {
       (Bad(_), Bad(_)) => Ordering::Less,
     }
   }
+
+  /// 切换本条日志的标记状态
+  pub fn toggle_mark(&mut self) {
+    match self {
+      Good(log) => log.marked = !log.marked,
+      Bad(log) => log.marked = !log.marked,
+    }
+  }
 }
 
 #[cfg(test)]
