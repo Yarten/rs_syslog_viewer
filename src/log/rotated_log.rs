@@ -2,9 +2,12 @@ use crate::log::{
   DataBoard, Event, LogFile, LogLine,
   log_file_content::{
     BackwardIter as LogFileBackwardIter, ForwardIter as LogFileForwardIter, Index as LogFileIndex,
+    BackwardIterMut as LogFileBackwardIterMut, ForwardIterMut as LogFileForwardIterMut,
   },
 };
 use std::{collections::VecDeque, fs, path::PathBuf, sync::Arc};
+use log::Log;
+use crate::log::log_file_content::LogFileContent;
 
 /// 索引某一个系统日志中的某一行
 #[derive(Copy, Clone, PartialEq, Eq)]
@@ -249,97 +252,130 @@ impl RotatedLog {
   }
 }
 
-/// 支持和索引互相转换的、 一组日志的正向迭代器，也即从旧往新的日志内容的迭代
-pub struct ForwardIter<'a> {
-  file_index: usize,
-  file_iter: Option<LogFileForwardIter<'a>>,
-  data: &'a RotatedLog,
-}
-
-impl<'a> Iterator for ForwardIter<'a> {
-  type Item = (Index, &'a LogLine);
-
-  fn next(&mut self) -> Option<Self::Item> {
-    match &mut self.file_iter {
-      None => None,
-      Some(file_iter) => match file_iter.next() {
-        None => {
-          self.file_index += 1;
-          self.file_iter = self
-            .data
-            .log_files
-            .get(self.file_index)
-            .and_then(|log_file| Some(log_file.iter_forward_from_head()));
-          self.next()
-        }
-        Some((line_index, line)) => Some((Index::new(self.file_index, line_index), line)),
-      },
+/// 定义前向、逆向的可变、不变迭代器，
+/// 前向、逆向的功能选择，通过传入的闭包表现决定。
+macro_rules! define_iterator {
+  ($name:ident, $get_func:ident $(, $mut_flag:tt)?) => {
+    pub struct $name<'a, I, IndexFunc, FileIterFunc>
+    where
+      I: Iterator<Item = (LogFileIndex, &'a $($mut_flag)? LogLine)>,
+      IndexFunc: Fn(usize) -> usize,
+      FileIterFunc: for<'b> Fn(&'b $($mut_flag)? LogFile) -> I,
+    {
+      file_index: usize,
+      file_iter: Option<I>,
+      data: &'a $($mut_flag)? RotatedLog,
+      index_func: IndexFunc,
+      file_iter_func: FileIterFunc,
     }
-  }
-}
 
-/// 支持和索引互相转换的、 一组日志的逆向迭代器，也即从新到旧的日志内容的迭代
-pub struct BackwardIter<'a> {
-  file_index: usize,
-  file_iter: Option<LogFileBackwardIter<'a>>,
-  data: &'a RotatedLog,
-}
+    impl<'a, I, IndexFunc, FileIterFunc> Iterator for $name<'a, I, IndexFunc, FileIterFunc>
+    where
+      I: Iterator<Item = (LogFileIndex, &'a $($mut_flag)? LogLine)>,
+      IndexFunc: Fn(usize) -> usize,
+      FileIterFunc: for<'b> Fn(&'b $($mut_flag)? LogFile) -> I,
+    {
+      type Item = (Index, &'a $($mut_flag)? LogLine);
 
-impl<'a> Iterator for BackwardIter<'a> {
-  type Item = (Index, &'a LogLine);
-
-  fn next(&mut self) -> Option<Self::Item> {
-    match &mut self.file_iter {
-      None => None,
-      Some(file_iter) => match file_iter.next() {
-        None => {
-          self.file_index = self.file_index.overflowing_sub(1).0;
-          self.file_iter = self
-            .data
-            .log_files
-            .get(self.file_index)
-            .and_then(|log_file| Some(log_file.iter_backward_from_tail()));
-          self.next()
+      fn next(&mut self) -> Option<Self::Item> {
+        match &mut self.file_iter {
+          None => None,
+          Some(file_iter) => match file_iter.next() {
+            None => {
+              self.file_index = (self.index_func)(self.file_index);
+              self.file_iter = self
+                .data
+                .log_files
+                .$get_func(self.file_index)
+                .and_then(|log_file| Some((self.file_iter_func)(log_file)));
+              self.next()
+            }
+            Some((line_index, line)) => Some((Index::new(self.file_index, line_index), line)),
+          },
         }
-        Some((line_index, line)) => Some((Index::new(self.file_index, line_index), line)),
-      },
+      }
     }
-  }
+  };
 }
+
+define_iterator!(Iter, get);
+define_iterator!(IterMut, get_mut, mut);
 
 impl RotatedLog {
   /// 获取从指定索引位置开始正向遍历的迭代器
-  pub fn iter_forward_from(&'_ self, index: Index) -> ForwardIter<'_> {
-    ForwardIter {
+  pub fn iter_forward_from(&'_ self, index: Index) -> impl Iterator<Item = (Index, &'_ LogLine)> {
+    Iter {
       file_index: index.file_index,
       file_iter: self
         .log_files
         .get(index.file_index)
-        .and_then(|log_file| Some(log_file.iter_forward_from(index.line_index))),
-      data: &self,
+        .and_then(|log_file| Some(log_file.data().iter_forward_from(index.line_index))),
+      data: self,
+      index_func: |i| i + 1,
+      file_iter_func: |log_file| {log_file.data().iter_forward_from_head()},
     }
   }
 
   /// 获取从指定索引位置开始逆向遍历的迭代器
-  pub fn iter_backward_from(&'_ self, index: Index) -> BackwardIter<'_> {
-    BackwardIter {
+  pub fn iter_backward_from(&'_ self, index: Index) -> impl Iterator<Item = (Index, &'_ LogLine)> {
+    Iter {
       file_index: index.file_index,
       file_iter: self
         .log_files
         .get(index.file_index)
-        .and_then(|log_file| Some(log_file.iter_backward_from(index.line_index))),
-      data: &self,
+        .and_then(|log_file| Some(log_file.data().iter_backward_from(index.line_index))),
+      data: self,
+      index_func: |i| i.overflowing_sub(1).0,
+      file_iter_func: |log_file| {log_file.data().iter_backward_from_tail()},
     }
   }
 
   /// 获取从第一条日志开始正向遍历的迭代器
-  pub fn iter_forward_from_head(&'_ self) -> ForwardIter<'_> {
+  pub fn iter_forward_from_head(&'_ self) -> impl Iterator<Item = (Index, &'_ LogLine)> {
     self.iter_forward_from(self.first_index())
   }
 
   /// 获取从最后一条日志开始逆向遍历的迭代器
-  pub fn iter_backward_from_tail(&'_ self) -> BackwardIter<'_> {
+  pub fn iter_backward_from_tail(&'_ self) -> impl Iterator<Item = (Index, &'_ LogLine)> {
     self.iter_backward_from(self.last_index())
+  }
+
+  /// 获取从指定索引位置开始逆向遍历的可变迭代器
+  pub fn iter_mut_forward_from(&'_ mut self, index: Index) -> impl Iterator<Item = (Index, &'_ mut LogLine)> {
+    IterMut {
+      file_index: index.file_index,
+      file_iter: self
+        .log_files
+        .get_mut(index.file_index)
+        .and_then(|log_file| Some(log_file.data_mut().iter_mut_forward_from(index.line_index))),
+      data: self,
+      index_func: |i| i + 1,
+      file_iter_func: |log_file| {log_file.data_mut().iter_mut_forward_from_head()},
+    }
+  }
+
+  /// 获取从指定索引位置开始逆向遍历的可变迭代器
+  pub fn iter_mut_backward_from(&'_ mut self, index: Index) -> impl Iterator<Item = (Index, &'_ mut LogLine)> {
+    IterMut {
+      file_index: index.file_index,
+      file_iter: self
+        .log_files
+        .get_mut(index.file_index)
+        .and_then(|log_file| Some(log_file.data_mut().iter_mut_backward_from(index.line_index))),
+      data: self,
+      index_func: |i| i.overflowing_sub(1).0,
+      file_iter_func: |log_file| {log_file.data_mut().iter_mut_backward_from_tail()},
+    }
+  }
+
+  /// 获取从第一条日志开始正向遍历的可变迭代器
+  pub fn iter_mut_forward_from_head(&'_ mut self) -> impl Iterator<Item = (Index, &'_ mut LogLine)> {
+    self.iter_mut_forward_from(self.first_index())
+  }
+
+  /// 获取从最后一条日志开始逆向遍历的可变迭代器
+  pub fn iter_mut_backward_from_tail(&'_ mut self) -> impl Iterator<Item = (Index, &'_ mut LogLine)> {
+    self.iter_mut_backward_from(self.last_index())
   }
 
   /// 获取指向第一条日志的索引
@@ -355,7 +391,7 @@ impl RotatedLog {
     let file_index = self.log_files.len().saturating_sub(1);
     let line_index = match self.log_files.get(file_index) {
       None => LogFileIndex::zero(),
-      Some(log_file) => log_file.last_index(),
+      Some(log_file) => log_file.data().last_index(),
     };
     Index {
       file_index,

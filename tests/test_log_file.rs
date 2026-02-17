@@ -29,8 +29,8 @@ async fn test_log_file() {
     }
   }
 
-  let content: Vec<LogLine> = common::collect_lines(log_file.iter_forward_from_head());
-  let reversed_content: Vec<LogLine> = common::collect_lines(log_file.iter_backward_from_tail());
+  let content: Vec<LogLine> = common::collect_lines(log_file.data().iter_forward_from_head());
+  let reversed_content: Vec<LogLine> = common::collect_lines(log_file.data().iter_backward_from_tail());
   let tags: BTreeSet<String> = data_board.get_tags().keys().cloned().collect();
 
   assert_eq!(&content, &true_content);

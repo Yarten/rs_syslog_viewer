@@ -101,28 +101,12 @@ impl LogFile {
     Ok(self.reader.stop().await?)
   }
 
-  pub fn iter_forward_from(&'_ self, index: Index) -> ForwardIter<'_> {
-    self.content.iter_forward_from(index)
+  pub fn data(&self) -> &LogFileContent {
+    &self.content
   }
 
-  pub fn iter_backward_from(&'_ self, index: Index) -> BackwardIter<'_> {
-    self.content.iter_backward_from(index)
-  }
-
-  pub fn iter_forward_from_head(&'_ self) -> ForwardIter<'_> {
-    self.content.iter_forward_from_head()
-  }
-
-  pub fn iter_backward_from_tail(&'_ self) -> BackwardIter<'_> {
-    self.content.iter_backward_from_tail()
-  }
-
-  pub fn first_index(&self) -> Index {
-    self.content.first_index()
-  }
-
-  pub fn last_index(&self) -> Index {
-    self.content.last_index()
+  pub fn data_mut(&mut self) -> &mut LogFileContent {
+    &mut self.content
   }
 
   pub fn path(&self) -> &PathBuf {

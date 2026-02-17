@@ -37,12 +37,6 @@ async fn test_log_hub() {
   let content: Vec<LogLine> = common::collect_lines(data.iter_forward_from_head());
   let reversed_content: Vec<LogLine> = common::collect_lines(data.iter_backward_from_tail());
 
-  for i in 0..true_content.len() {
-    if true_content[i] != content[i] {
-      panic!("fuck")
-    }
-  }
-
   assert_eq!(&content, &true_content);
   assert_eq!(&reversed_content, &true_reversed_content);
 }

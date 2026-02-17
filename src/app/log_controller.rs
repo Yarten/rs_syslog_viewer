@@ -11,8 +11,25 @@ struct ViewPort {
   /// 日志行，从前往后对应展示区的日志从上往下
   logs: VecDeque<LogLine>,
 
-  /// 光标所在的行索引
+  /// 光标位置，指的是相对于 height 中的定位
   cursor: usize,
+
+  /// 光标数据索引，指的是相对于 logs 中的定位，
+  /// 它和 `cursor` 不一定重叠，特别是在新的一帧构建过程中，
+  /// 因此，每帧渲染获取数据的时候，将进行光标重定位
+  cursor_index: usize,
+}
+
+impl ViewPort {
+  fn clear(&mut self) -> &mut Self {
+    self.logs.clear();
+    self
+  }
+
+  fn cursor_to_last(&mut self) -> &mut Self {
+    self.cursor = self.height.saturating_sub(1);
+    self
+  }
 }
 
 /// 描述本帧内的控制

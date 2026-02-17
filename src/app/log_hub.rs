@@ -214,6 +214,13 @@ where
 }
 
 impl LogHubData {
+  pub fn get(&'_ self, index: Index) -> Option<&'_ LogLine> {
+    self
+      .iter_forward_from(index)
+      .next()
+      .and_then(|(_, log)| Some(log))
+  }
+
   /// 获取从指定索引处，开始正向遍历的迭代器
   pub fn iter_forward_from(&'_ self, index: Index) -> impl Iterator<Item = (Index, &'_ LogLine)> {
     Iter {

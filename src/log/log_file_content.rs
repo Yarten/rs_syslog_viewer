@@ -77,12 +77,18 @@ impl Chunk {
 
   /// 获取指定索引的数据
   fn get(&'_ self, i: usize) -> Option<&'_ LogLine> {
-    if self.reversed {
-      self
-        .lines
-        .get(self.lines.len().overflowing_sub(1).0.overflowing_sub(i).0)
+    self.lines.get(self.get_real_index(i))
+  }
+
+  /// 获取指定索引的可变数据
+  fn get_mut<'a>(&mut self, i: usize) -> Option<&'a mut LogLine> {
+    let i = self.get_real_index(i);
+
+    if i >= self.lines.len() {
+      None
     } else {
-      self.lines.get(i)
+      let line = unsafe { &mut *(self.lines.get_unchecked_mut(i) as *mut LogLine) };
+      Some(line)
     }
   }
 
@@ -91,6 +97,15 @@ impl Chunk {
   /// 导致时间值准确的，因此无法假定 first time 一定小于 last time
   fn first_time(&self) -> Option<DateTime<FixedOffset>> {
     todo!()
+  }
+
+  /// 给定逻辑上的数据索引，获取真实的数据索引
+  fn get_real_index(&self, i: usize) -> usize {
+    if self.reversed {
+      self.lines.len().overflowing_sub(1).0.overflowing_sub(i).0
+    } else {
+      i
+    }
   }
 }
 
@@ -226,20 +241,37 @@ impl LogFileContent {
     }
   }
 
-  pub fn iter_forward_from(&'_ self, index: Index) -> ForwardIter<'_> {
-    ForwardIter { index, data: &self }
+  pub fn iter_forward_from<'a>(&self, index: Index) -> ForwardIter<'a> {
+    ForwardIter { index, data: self.unsafe_ref() }
   }
 
-  pub fn iter_backward_from(&'_ self, index: Index) -> BackwardIter<'_> {
-    BackwardIter { index, data: &self }
+  pub fn iter_backward_from<'a>(&self, index: Index) -> BackwardIter<'a> {
+    BackwardIter { index, data: self.unsafe_ref() }
   }
 
-  pub fn iter_forward_from_head(&'_ self) -> ForwardIter<'_> {
+  pub fn iter_forward_from_head<'a>(&self) -> ForwardIter<'a> {
     self.iter_forward_from(self.first_index())
   }
 
-  pub fn iter_backward_from_tail(&'_ self) -> BackwardIter<'_> {
+  pub fn iter_backward_from_tail<'a>(&self) -> BackwardIter<'a> {
     self.iter_backward_from(self.last_index())
+  }
+
+  pub fn iter_mut_forward_from<'a>(&mut self, index: Index) -> ForwardIterMut<'a> {
+    // ForwardIterMut { index, data: self }
+    ForwardIterMut { index, data: self.unsafe_mut_ref() }
+  }
+
+  pub fn iter_mut_backward_from<'a>(&mut self, index: Index) -> BackwardIterMut<'a> {
+    BackwardIterMut { index, data: self.unsafe_mut_ref() }
+  }
+
+  pub fn iter_mut_forward_from_head<'a>(&mut self) -> ForwardIterMut<'a> {
+    self.iter_mut_forward_from(self.first_index())
+  }
+
+  pub fn iter_mut_backward_from_tail<'a>(&'_ mut self) -> BackwardIterMut<'a> {
+    self.iter_mut_backward_from(self.last_index())
   }
 
   pub fn first_index(&self) -> Index {
@@ -254,6 +286,14 @@ impl LogFileContent {
     };
     Index::new(chunk_index, line_index)
   }
+
+  fn unsafe_ref<'a>(&self) -> &'a Self {
+    unsafe { &*(self as *const LogFileContent) }
+  }
+
+  fn unsafe_mut_ref<'a>(&mut self) -> &'a mut Self {
+    unsafe { &mut *(self as *mut LogFileContent) }
+  }
 }
 
 impl Default for LogFileContent {
@@ -263,67 +303,84 @@ impl Default for LogFileContent {
   }
 }
 
+macro_rules! define_iterator {
+    ($name:ident $(, $mut_flag:tt)?) => {
+      pub struct $name<'a> {
+        index: Index,
+        data: &'a $($mut_flag)? LogFileContent,
+      }
+    };
+}
+
 /// 支持和索引互相转换的，一份日志文件内的正向迭代器
-pub struct ForwardIter<'a> {
-  index: Index,
-  data: &'a LogFileContent,
-}
+macro_rules! forward_iterator {
+  ($name:ident, $get_func:ident $(, $mut_flag:tt)?) => {
+    define_iterator!($name $(, $mut_flag)?);
 
-impl<'a> Iterator for ForwardIter<'a> {
-  type Item = (Index, &'a LogLine);
+    impl<'a> Iterator for $name<'a> {
+      type Item = (Index, &'a $($mut_flag)? LogLine);
 
-  fn next(&mut self) -> Option<Self::Item> {
-    match self.data.chunks.get(self.index.chunk_index) {
-      None => None,
-      Some(chunk) => match chunk.get(self.index.line_index) {
-        None => {
-          self.index.chunk_index += 1;
-          self.index.line_index = 0;
-          self.next()
+      fn next(&mut self) -> Option<Self::Item> {
+        match self.data.chunks.$get_func(self.index.chunk_index) {
+          None => None,
+          Some(chunk) => match chunk.$get_func(self.index.line_index) {
+            None => {
+              self.index.chunk_index += 1;
+              self.index.line_index = 0;
+              self.next()
+            }
+            Some(line) => {
+              let index = self.index;
+              self.index.line_index += 1;
+              Some((index, line))
+            }
+          },
         }
-        Some(line) => {
-          let index = self.index;
-          self.index.line_index += 1;
-          Some((index, line))
-        }
-      },
+      }
     }
-  }
+  };
 }
+
+forward_iterator!(ForwardIter, get);
+forward_iterator!(ForwardIterMut, get_mut, mut);
 
 /// 支持和索引互相转换的，一份日志文件内的逆向迭代器
-pub struct BackwardIter<'a> {
-  index: Index,
-  data: &'a LogFileContent,
-}
+macro_rules! backward_iterator {
+  ($name:ident, $get_func:ident $(, $mut_flag:tt)?) => {
+    define_iterator!($name $(, $mut_flag)?);
 
-impl<'a> Iterator for BackwardIter<'a> {
-  type Item = (Index, &'a LogLine);
+    impl<'a> Iterator for $name<'a> {
+      type Item = (Index, &'a $($mut_flag)? LogLine);
 
-  fn next(&mut self) -> Option<Self::Item> {
-    match self.data.chunks.get(self.index.chunk_index) {
-      None => None,
-      Some(chunk) => match chunk.get(self.index.line_index) {
-        None => match self.index.chunk_index.checked_sub(1) {
+      fn next(&mut self) -> Option<Self::Item> {
+        match self.data.chunks.$get_func(self.index.chunk_index) {
           None => None,
-          Some(chunk_index) => {
-            self.index.chunk_index = chunk_index;
-            self.index.line_index = self.data.chunks[self.index.chunk_index]
-              .len()
-              .overflowing_sub(1)
-              .0;
-            self.next()
-          }
-        },
-        Some(line) => {
-          let index = self.index;
-          self.index.line_index = self.index.line_index.overflowing_sub(1).0;
-          Some((index, line))
+          Some(chunk) => match chunk.$get_func(self.index.line_index) {
+            None => match self.index.chunk_index.checked_sub(1) {
+              None => None,
+              Some(chunk_index) => {
+                self.index.chunk_index = chunk_index;
+                self.index.line_index = self.data.chunks[self.index.chunk_index]
+                  .len()
+                  .overflowing_sub(1)
+                  .0;
+                self.next()
+              }
+            },
+            Some(line) => {
+              let index = self.index;
+              self.index.line_index = self.index.line_index.overflowing_sub(1).0;
+              Some((index, line))
+            }
+          },
         }
-      },
+      }
     }
-  }
+  };
 }
+
+backward_iterator!(BackwardIter, get);
+backward_iterator!(BackwardIterMut, get_mut, mut);
 
 struct Iter<'a, EiChunk>
 where
