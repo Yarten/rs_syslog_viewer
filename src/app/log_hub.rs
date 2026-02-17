@@ -157,61 +157,76 @@ impl Drop for LogHubDataGuard<'_> {
   }
 }
 
+/// 打破 rust 对被索引日志的引用生命周期检查
+macro_rules! unsafe_log_ref {
+    ($var:ident) => {$var};
+    ($var:ident, mut) => {unsafe { &mut *(*$var as *mut LogLine) }}
+}
+
 /// 同时处理所有系统日志的向量迭代器
-pub struct Iter<'a, I, F>
-where
-  I: Iterator<Item = (LogIndex, &'a LogLine)>,
-  F: Fn(&LogLine, &LogLine) -> Ordering,
-{
-  iters: Vec<(I, Option<(LogIndex, &'a LogLine)>)>,
-  cmp: F,
-}
+macro_rules! define_iterator {
+  ($name:ident $(, $mut_flag:tt)?) => {
+    pub struct $name<'a, I, F>
+    where
+      I: Iterator<Item = (LogIndex, &'a $($mut_flag)? LogLine)>,
+      F: Fn(&LogLine, &LogLine) -> Ordering,
+    {
+      iters: Vec<(I, Option<(LogIndex, &'a $($mut_flag)? LogLine)>)>,
+      cmp: F,
+    }
 
-impl<'a, I, F> Iterator for Iter<'a, I, F>
-where
-  I: Iterator<Item = (LogIndex, &'a LogLine)>,
-  F: Fn(&LogLine, &LogLine) -> Ordering,
-{
-  type Item = (Index, &'a LogLine);
+    impl<'a, I, F> Iterator for $name<'a, I, F>
+    where
+      I: Iterator<Item = (LogIndex, &'a $($mut_flag)? LogLine)>,
+      F: Fn(&LogLine, &LogLine) -> Ordering,
+    {
+      type Item = (Index, &'a $($mut_flag)? LogLine);
 
-  fn next(&mut self) -> Option<Self::Item> {
-    // 所有日志的索引向量
-    let mut index = Index {
-      indexes: Vec::with_capacity(self.iters.len()),
-    };
+      fn next(&mut self) -> Option<Self::Item> {
+        // 所有日志的索引向量
+        let mut index = Index {
+          indexes: Vec::with_capacity(self.iters.len()),
+        };
 
-    // 记录极值元素
-    let mut min_elem: Option<(usize, &'a LogLine)> = None;
+        // 记录极值元素
+        let mut min_elem: Option<(usize, &'a $($mut_flag)? LogLine)> = None;
 
-    // 找到所有日志中的极值
-    for (nth, (i, elem)) in self.iters.iter_mut().enumerate() {
-      if elem.is_none() {
-        *elem = i.next();
-      }
+        // 找到所有日志中的极值
+        for (nth, (i, elem)) in self.iters.iter_mut().enumerate() {
+          if elem.is_none() {
+            *elem = i.next();
+          }
 
-      if let Some((idx, log)) = elem {
-        index.indexes.push(*idx);
+          if let Some((idx, log)) = elem {
+            index.indexes.push(*idx);
 
-        if match min_elem {
-          None => true,
-          Some((_, min_log)) => (self.cmp)(log, min_log) == Ordering::Less,
-        } {
-          min_elem = Some((nth, log))
+            if match &min_elem {
+              None => true,
+              Some((_, min_log)) => (self.cmp)(log, min_log) == Ordering::Less,
+            } {
+              let log = unsafe_log_ref!(log $(, $mut_flag)?);
+              min_elem = Some((nth, log))
+            }
+          } else {
+            index.indexes.push(LogIndex::zero());
+          }
         }
-      } else {
-        index.indexes.push(LogIndex::zero());
+
+        // 若找到了极值，则需要将其取到的数据记录清掉，以便于下一个周期取新的进行比较
+        if let Some((nth, min_log)) = min_elem {
+          self.iters[nth].1 = None;
+          Some((index, min_log))
+        } else {
+          None
+        }
       }
     }
-
-    // 若找到了极值，则需要将其取到的数据记录清掉，以便于下一个周期取新的进行比较
-    if let Some((nth, min_log)) = min_elem {
-      self.iters[nth].1 = None;
-      Some((index, min_log))
-    } else {
-      None
-    }
-  }
+  };
 }
+
+define_iterator!(Iter);
+define_iterator!(IterMut, mut);
+
 
 impl LogHubData {
   pub fn get(&'_ self, index: Index) -> Option<&'_ LogLine> {
@@ -227,8 +242,8 @@ impl LogHubData {
       iters: index
         .indexes
         .iter()
-        .enumerate()
-        .map(|(nth, idx)| (self.logs[nth].iter_forward_from(*idx), None))
+        .zip(self.logs.iter())
+        .map(|(idx, log)| (log.iter_forward_from(*idx), None))
         .collect(),
       cmp: LogLine::is_older,
     }
@@ -240,8 +255,8 @@ impl LogHubData {
       iters: index
         .indexes
         .iter()
-        .enumerate()
-        .map(|(nth, idx)| (self.logs[nth].iter_backward_from(*idx), None))
+        .zip(self.logs.iter())
+        .map(|(idx, log)| (log.iter_backward_from(*idx), None))
         .collect(),
       cmp: LogLine::is_newer,
     }
@@ -255,6 +270,42 @@ impl LogHubData {
   /// 获取从最后一条日志开始逆向遍历的迭代器
   pub fn iter_backward_from_tail(&'_ self) -> impl Iterator<Item = (Index, &'_ LogLine)> {
     self.iter_backward_from(self.last_index())
+  }
+
+  /// 获取从指定索引处，开始正向遍历的可变迭代器
+  pub fn iter_mut_forward_from(&'_ mut self, index: Index) -> impl Iterator<Item = (Index, &'_ mut LogLine)> {
+    IterMut {
+      iters: index
+        .indexes
+        .iter()
+        .zip(self.logs.iter_mut())
+        .map(|(idx, log)| (log.iter_mut_forward_from(*idx), None))
+        .collect(),
+      cmp: LogLine::is_older,
+    }
+  }
+
+  /// 获取从指定索引处，开始逆向遍历的可变迭代器
+  pub fn iter_mut_backward_from(&'_ mut self, index: Index) -> impl Iterator<Item = (Index, &'_ mut LogLine)> {
+    IterMut {
+      iters: index
+        .indexes
+        .iter()
+        .zip(self.logs.iter_mut())
+        .map(|(idx, log)| (log.iter_mut_backward_from(*idx), None))
+        .collect(),
+      cmp: LogLine::is_newer,
+    }
+  }
+
+  /// 获取从第一条日志开始正向遍历的可变迭代器
+  pub fn iter_mut_forward_from_head(&'_ mut self) -> impl Iterator<Item = (Index, &'_ mut LogLine)> {
+    self.iter_mut_forward_from(self.first_index())
+  }
+
+  /// 获取从最后一条日志开始逆向遍历的可变迭代器
+  pub fn iter_mut_backward_from_tail(&'_ mut self) -> impl Iterator<Item = (Index, &'_ mut LogLine)> {
+    self.iter_mut_backward_from(self.last_index())
   }
 
   /// 获取指向首条日志的索引
