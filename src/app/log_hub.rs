@@ -1,10 +1,17 @@
 use crate::log::{Config, DataBoard, Index as LogIndex, LogLine, RotatedLog};
-use std::ops::DerefMut;
-use std::{cmp::Ordering, collections::HashMap, ops::Deref, path::Path, sync::Arc};
+use std::path::PathBuf;
+use std::{
+  cmp::Ordering,
+  collections::HashMap,
+  ops::{Deref, DerefMut},
+  path::Path,
+  sync::Arc,
+};
 use tokio::task::{self, JoinHandle};
 use tokio_util::sync::CancellationToken;
 
 /// 所有日志文件的索引
+#[derive(Clone)]
 pub struct Index {
   indexes: Vec<LogIndex>,
 }
@@ -33,7 +40,7 @@ pub struct LogHub {
 impl LogHub {
   /// 基于给定的系统日志存储根目录，以及已知的系统日志名称（文件名，不含后缀），
   /// 创建本对象
-  pub fn open(root: &Path, names: HashMap<String, Config>) -> Self {
+  pub fn open(root: PathBuf, names: HashMap<String, Config>) -> Self {
     // 创建各个系统日志对象，组成有序的数组，该顺序在整个进程内都不会再改变
     let logs: Vec<RotatedLog> = names
       .into_iter()
@@ -44,7 +51,7 @@ impl LogHub {
     let mut hub = Self {
       logs_data: LogHubData {
         logs,
-        data_board: Arc::new(DataBoard::default()),
+        data_board: Arc::new(DataBoard::new(root)),
       },
       log_handles: Vec::new(),
       stop_token: CancellationToken::new(),
@@ -159,8 +166,12 @@ impl Drop for LogHubDataGuard<'_> {
 
 /// 打破 rust 对被索引日志的引用生命周期检查
 macro_rules! unsafe_log_ref {
-    ($var:ident) => {$var};
-    ($var:ident, mut) => {unsafe { &mut *(*$var as *mut LogLine) }}
+  ($var:ident) => {
+    $var
+  };
+  ($var:ident, mut) => {
+    unsafe { &mut *(*$var as *mut LogLine) }
+  };
 }
 
 /// 同时处理所有系统日志的向量迭代器
@@ -227,7 +238,6 @@ macro_rules! define_iterator {
 define_iterator!(Iter);
 define_iterator!(IterMut, mut);
 
-
 impl LogHubData {
   pub fn get(&'_ self, index: Index) -> Option<&'_ LogLine> {
     self
@@ -273,7 +283,10 @@ impl LogHubData {
   }
 
   /// 获取从指定索引处，开始正向遍历的可变迭代器
-  pub fn iter_mut_forward_from(&'_ mut self, index: Index) -> impl Iterator<Item = (Index, &'_ mut LogLine)> {
+  pub fn iter_mut_forward_from(
+    &'_ mut self,
+    index: Index,
+  ) -> impl Iterator<Item = (Index, &'_ mut LogLine)> {
     IterMut {
       iters: index
         .indexes
@@ -286,7 +299,10 @@ impl LogHubData {
   }
 
   /// 获取从指定索引处，开始逆向遍历的可变迭代器
-  pub fn iter_mut_backward_from(&'_ mut self, index: Index) -> impl Iterator<Item = (Index, &'_ mut LogLine)> {
+  pub fn iter_mut_backward_from(
+    &'_ mut self,
+    index: Index,
+  ) -> impl Iterator<Item = (Index, &'_ mut LogLine)> {
     IterMut {
       iters: index
         .indexes
@@ -299,12 +315,16 @@ impl LogHubData {
   }
 
   /// 获取从第一条日志开始正向遍历的可变迭代器
-  pub fn iter_mut_forward_from_head(&'_ mut self) -> impl Iterator<Item = (Index, &'_ mut LogLine)> {
+  pub fn iter_mut_forward_from_head(
+    &'_ mut self,
+  ) -> impl Iterator<Item = (Index, &'_ mut LogLine)> {
     self.iter_mut_forward_from(self.first_index())
   }
 
   /// 获取从最后一条日志开始逆向遍历的可变迭代器
-  pub fn iter_mut_backward_from_tail(&'_ mut self) -> impl Iterator<Item = (Index, &'_ mut LogLine)> {
+  pub fn iter_mut_backward_from_tail(
+    &'_ mut self,
+  ) -> impl Iterator<Item = (Index, &'_ mut LogLine)> {
     self.iter_mut_backward_from(self.last_index())
   }
 
@@ -334,5 +354,12 @@ impl LogHubData {
           log.set_want_older_log();
         }
       });
+  }
+}
+
+impl LogHubData {
+  /// 获取日志数据看板
+  pub fn data_board(&self) -> &DataBoard {
+    self.data_board.as_ref()
   }
 }

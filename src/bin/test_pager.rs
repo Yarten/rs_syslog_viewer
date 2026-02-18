@@ -50,10 +50,10 @@ fn main() -> Result<()> {
   color_eyre::install()?;
 
   let pager = Pager::default()
-    .add_page_as_root(Box::new(DemoPage::new("Root")))
-    .add_page(1, Box::new(DemoPage::new("Aaaa")))
-    .add_page(2, Box::new(DemoPage::new("Bbbb")))
-    .add_page(3, Box::new(DemoPage::new("Cccc")));
+    .add_page_as_root(DemoPage::new("Root"))
+    .add_page(1, DemoPage::new("Aaaa"))
+    .add_page(2, DemoPage::new("Bbbb"))
+    .add_page(3, DemoPage::new("Cccc"));
 
   ratatui::run(|terminal| run(terminal, pager))
 }

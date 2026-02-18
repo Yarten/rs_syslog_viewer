@@ -54,10 +54,10 @@ fn run(terminal: &mut DefaultTerminal) -> Result<()> {
     .state(QUIT_STATE, quit_state);
 
   let mut pager = Pager::default()
-    .add_page_as_root(Box::new(DemoPage::new("Root")))
-    .add_page(1, Box::new(DemoPage::new("Aaaa")))
-    .add_page(2, Box::new(DemoPage::new("Bbbb")))
-    .add_page(3, Box::new(DemoPage::new("Cccc")));
+    .add_page_as_root(DemoPage::new("Root"))
+    .add_page(1, DemoPage::new("Aaaa"))
+    .add_page(2, DemoPage::new("Bbbb"))
+    .add_page(3, DemoPage::new("Cccc"));
 
   sm.first_run(&mut pager);
   loop {

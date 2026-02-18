@@ -235,11 +235,17 @@ impl LogFileContent {
   }
 
   pub fn iter_forward_from<'a>(&self, index: Index) -> ForwardIter<'a> {
-    ForwardIter { index, data: self.unsafe_ref() }
+    ForwardIter {
+      index,
+      data: self.unsafe_ref(),
+    }
   }
 
   pub fn iter_backward_from<'a>(&self, index: Index) -> BackwardIter<'a> {
-    BackwardIter { index, data: self.unsafe_ref() }
+    BackwardIter {
+      index,
+      data: self.unsafe_ref(),
+    }
   }
 
   pub fn iter_forward_from_head<'a>(&self) -> ForwardIter<'a> {
@@ -252,11 +258,17 @@ impl LogFileContent {
 
   pub fn iter_mut_forward_from<'a>(&mut self, index: Index) -> ForwardIterMut<'a> {
     // ForwardIterMut { index, data: self }
-    ForwardIterMut { index, data: self.unsafe_mut_ref() }
+    ForwardIterMut {
+      index,
+      data: self.unsafe_mut_ref(),
+    }
   }
 
   pub fn iter_mut_backward_from<'a>(&mut self, index: Index) -> BackwardIterMut<'a> {
-    BackwardIterMut { index, data: self.unsafe_mut_ref() }
+    BackwardIterMut {
+      index,
+      data: self.unsafe_mut_ref(),
+    }
   }
 
   pub fn iter_mut_forward_from_head<'a>(&mut self) -> ForwardIterMut<'a> {

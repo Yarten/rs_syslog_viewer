@@ -8,7 +8,10 @@ use ratatui::{
   style::{Color, Style},
   widgets::{BorderType, Borders, Paragraph, Widget},
 };
-use std::collections::{HashMap, VecDeque};
+use std::{
+  borrow::Cow,
+  collections::{HashMap, VecDeque},
+};
 
 /// 适用于本页面管理器的渲染接口
 pub trait Page {
@@ -18,7 +21,7 @@ pub trait Page {
   fn render(&self, area: Rect, buf: &mut Buffer, input: Option<String>);
 
   /// 本页面的标题名称
-  fn title(&self) -> &str;
+  fn title(&'_ self) -> Cow<'_, str>;
 }
 
 /// 若 root page 没有指定时，默认使用该页面
@@ -31,8 +34,8 @@ impl Page for DefaultPage {
       .render(area, buf);
   }
 
-  fn title(&self) -> &str {
-    "..."
+  fn title(&'_ self) -> Cow<'_, str> {
+    "...".into()
   }
 }
 
@@ -58,8 +61,8 @@ impl Page for DemoPage {
       .render(area, buf);
   }
 
-  fn title(&self) -> &str {
-    &self.name
+  fn title(&'_ self) -> Cow<'_, str> {
+    (&self.name).into()
   }
 }
 
@@ -186,13 +189,13 @@ impl Pager {
     }
   }
 
-  pub fn add_page(mut self, index: usize, page: Box<dyn Page>) -> Self {
-    self.pages.insert(index, page);
+  pub fn add_page(mut self, index: usize, page: impl Page + 'static) -> Self {
+    self.pages.insert(index, Box::new(page));
     self
   }
 
-  pub fn add_page_as_root(mut self, page: Box<dyn Page>) -> Self {
-    self.root_page = page;
+  pub fn add_page_as_root(mut self, page: impl Page + 'static) -> Self {
+    self.root_page = Box::new(page);
     self
   }
 }

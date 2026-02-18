@@ -1,5 +1,9 @@
-use std::collections::{BTreeMap, HashSet};
-use std::sync::{Mutex, MutexGuard};
+use std::sync::Arc;
+use std::{
+  collections::{BTreeMap, HashSet},
+  path::{Path, PathBuf},
+  sync::{Mutex, MutexGuard},
+};
 
 /// 记录着贯穿整个 viewer 的统计数据
 #[derive(Default)]
@@ -9,6 +13,18 @@ pub struct DataBoard {
 
   /// 用于快速查重的标签集合，无序
   hashed_tags: Mutex<HashSet<String>>,
+
+  /// 日志文件所在的根目录
+  log_files_root: Arc<PathBuf>,
+}
+
+impl DataBoard {
+  pub fn new(log_files_root: PathBuf) -> Self {
+    Self {
+      log_files_root: Arc::new(log_files_root),
+      ..DataBoard::default()
+    }
+  }
 }
 
 impl DataBoard {
@@ -28,5 +44,10 @@ impl DataBoard {
   /// 获取所有的日志标签（有序）
   pub fn get_tags(&'_ self) -> MutexGuard<'_, BTreeMap<String, bool>> {
     self.ordered_tags.lock().unwrap()
+  }
+
+  /// 获取日志所在的根目录
+  pub fn get_root_path(&self) -> Arc<PathBuf> {
+    self.log_files_root.clone()
   }
 }

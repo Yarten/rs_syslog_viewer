@@ -19,7 +19,7 @@ async fn test_log_hub() {
   let true_reversed_content: Vec<LogLine> = true_content.iter().rev().cloned().collect();
 
   let mut log_hub = LogHub::open(
-    &root,
+    root,
     names
       .iter()
       .map(|name| (name.to_string(), Config::default()))

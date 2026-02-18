@@ -1,13 +1,14 @@
+use crate::log::log_file_content::LogFileContent;
 use crate::log::{
   DataBoard, Event, LogFile, LogLine,
   log_file_content::{
-    BackwardIter as LogFileBackwardIter, ForwardIter as LogFileForwardIter, Index as LogFileIndex,
-    BackwardIterMut as LogFileBackwardIterMut, ForwardIterMut as LogFileForwardIterMut,
+    BackwardIter as LogFileBackwardIter, BackwardIterMut as LogFileBackwardIterMut,
+    ForwardIter as LogFileForwardIter, ForwardIterMut as LogFileForwardIterMut,
+    Index as LogFileIndex,
   },
 };
-use std::{collections::VecDeque, fs, path::PathBuf, sync::Arc};
 use log::Log;
-use crate::log::log_file_content::LogFileContent;
+use std::{collections::VecDeque, fs, path::PathBuf, sync::Arc};
 
 /// 索引某一个系统日志中的某一行
 #[derive(Copy, Clone, PartialEq, Eq)]
@@ -312,7 +313,7 @@ impl RotatedLog {
         .and_then(|log_file| Some(log_file.data().iter_forward_from(index.line_index))),
       data: self,
       index_func: |i| i + 1,
-      file_iter_func: |log_file| {log_file.data().iter_forward_from_head()},
+      file_iter_func: |log_file| log_file.data().iter_forward_from_head(),
     }
   }
 
@@ -326,7 +327,7 @@ impl RotatedLog {
         .and_then(|log_file| Some(log_file.data().iter_backward_from(index.line_index))),
       data: self,
       index_func: |i| i.overflowing_sub(1).0,
-      file_iter_func: |log_file| {log_file.data().iter_backward_from_tail()},
+      file_iter_func: |log_file| log_file.data().iter_backward_from_tail(),
     }
   }
 
@@ -341,7 +342,10 @@ impl RotatedLog {
   }
 
   /// 获取从指定索引位置开始逆向遍历的可变迭代器
-  pub fn iter_mut_forward_from(&'_ mut self, index: Index) -> impl Iterator<Item = (Index, &'_ mut LogLine)> {
+  pub fn iter_mut_forward_from(
+    &'_ mut self,
+    index: Index,
+  ) -> impl Iterator<Item = (Index, &'_ mut LogLine)> {
     IterMut {
       file_index: index.file_index,
       file_iter: self
@@ -350,12 +354,15 @@ impl RotatedLog {
         .and_then(|log_file| Some(log_file.data_mut().iter_mut_forward_from(index.line_index))),
       data: self,
       index_func: |i| i + 1,
-      file_iter_func: |log_file| {log_file.data_mut().iter_mut_forward_from_head()},
+      file_iter_func: |log_file| log_file.data_mut().iter_mut_forward_from_head(),
     }
   }
 
   /// 获取从指定索引位置开始逆向遍历的可变迭代器
-  pub fn iter_mut_backward_from(&'_ mut self, index: Index) -> impl Iterator<Item = (Index, &'_ mut LogLine)> {
+  pub fn iter_mut_backward_from(
+    &'_ mut self,
+    index: Index,
+  ) -> impl Iterator<Item = (Index, &'_ mut LogLine)> {
     IterMut {
       file_index: index.file_index,
       file_iter: self
@@ -364,17 +371,21 @@ impl RotatedLog {
         .and_then(|log_file| Some(log_file.data_mut().iter_mut_backward_from(index.line_index))),
       data: self,
       index_func: |i| i.overflowing_sub(1).0,
-      file_iter_func: |log_file| {log_file.data_mut().iter_mut_backward_from_tail()},
+      file_iter_func: |log_file| log_file.data_mut().iter_mut_backward_from_tail(),
     }
   }
 
   /// 获取从第一条日志开始正向遍历的可变迭代器
-  pub fn iter_mut_forward_from_head(&'_ mut self) -> impl Iterator<Item = (Index, &'_ mut LogLine)> {
+  pub fn iter_mut_forward_from_head(
+    &'_ mut self,
+  ) -> impl Iterator<Item = (Index, &'_ mut LogLine)> {
     self.iter_mut_forward_from(self.first_index())
   }
 
   /// 获取从最后一条日志开始逆向遍历的可变迭代器
-  pub fn iter_mut_backward_from_tail(&'_ mut self) -> impl Iterator<Item = (Index, &'_ mut LogLine)> {
+  pub fn iter_mut_backward_from_tail(
+    &'_ mut self,
+  ) -> impl Iterator<Item = (Index, &'_ mut LogLine)> {
     self.iter_mut_backward_from(self.last_index())
   }
 

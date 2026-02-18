@@ -1,5 +1,5 @@
 mod key_event_ex;
-mod pager;
+pub mod pager;
 mod state_machine;
 mod status_bar;
 

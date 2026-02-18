@@ -41,10 +41,10 @@ pub struct NormalLogLine {
 #[derive(PartialEq, Debug, Clone)]
 pub struct BrokenLogLine {
   /// 内容
-  content: String,
+  pub content: String,
 
   /// 标记该日志是否被 marked，用于 viewer 快速定位
-  marked: bool,
+  pub marked: bool,
 }
 
 /// 记录当前的时间

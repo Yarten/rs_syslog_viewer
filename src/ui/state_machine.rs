@@ -195,6 +195,12 @@ pub struct StateMachine {
   curr_state_index: usize,
 }
 
+impl Default for StateMachine {
+  fn default() -> Self {
+    Self::new(Duration::from_millis(100))
+  }
+}
+
 impl StateMachine {
   pub fn new(poll_interval: Duration) -> Self {
     let res = Self {
