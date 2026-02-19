@@ -1,11 +1,10 @@
-mod controller;
-mod log_controller;
+pub mod controller;
 mod log_hub;
-mod log_page;
+pub mod page;
+pub mod state;
 mod viewer;
 
 pub use controller::Controller;
-pub use log_controller::LogController;
 pub use log_hub::{Index, LogHub, LogHubData};
-pub use log_page::LogPage;
+pub use state::StateBuilder;
 pub use viewer::{Config, Viewer};

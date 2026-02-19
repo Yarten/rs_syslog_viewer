@@ -1,4 +1,4 @@
-use crate::{app::LogController, log::LogLine, ui::Page};
+use crate::{app::controller::LogController, log::LogLine, ui::Page};
 use ratatui::style::{Color, Style};
 use ratatui::widgets::{List, ListState};
 use ratatui::{
@@ -19,11 +19,7 @@ impl Page for LogPage {
     let mut ctrl = self.log_controller.borrow_mut();
 
     // 组装日志
-    let logs: Vec<ListItem> = ctrl
-      .logs()
-      .iter()
-      .map(|i| self.render_log_line(i))
-      .collect();
+    let logs: Vec<ListItem> = ctrl.logs().map(|i| self.render_log_line(i)).collect();
 
     // 构建 list state
     let mut state = ListState::default();
@@ -45,6 +41,7 @@ impl Page for LogPage {
 }
 
 impl LogPage {
+  /// 为给定的日志行，创建可渲染的列表项
   fn render_log_line<'a>(&self, log: &'a LogLine) -> ListItem<'a> {
     let mut line = text::Line::default();
 

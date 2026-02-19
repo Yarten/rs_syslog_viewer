@@ -1,5 +1,7 @@
 use crate::app::LogHubData;
 
+mod log_controller;
+
 /// 维护一个页面所需的操作接口、数据接口的逻辑控制器，实现 App 功能
 pub trait Controller {
   /// 在 App 主处理循环中，对日志数据进行一次逻辑控制处理，
@@ -11,3 +13,5 @@ pub trait Controller {
     false
   }
 }
+
+pub use log_controller::LogController;

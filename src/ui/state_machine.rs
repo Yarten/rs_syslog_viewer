@@ -180,6 +180,19 @@ impl State {
   }
 }
 
+/// 状态机的配置
+pub struct Config {
+  poll_interval: Duration,
+}
+
+impl Default for Config {
+  fn default() -> Self {
+    Self {
+      poll_interval: Duration::from_millis(100),
+    }
+  }
+}
+
 /// 处理 UI 的键盘事件，管理多个状态，并执行它们的转移与响应
 pub struct StateMachine {
   /// 使用整数索引的所有状态量
@@ -197,16 +210,16 @@ pub struct StateMachine {
 
 impl Default for StateMachine {
   fn default() -> Self {
-    Self::new(Duration::from_millis(100))
+    Self::new(Default::default())
   }
 }
 
 impl StateMachine {
-  pub fn new(poll_interval: Duration) -> Self {
+  pub fn new(config: Config) -> Self {
     let res = Self {
       states: HashMap::new(),
       root_state_index: 0,
-      poll_interval,
+      poll_interval: config.poll_interval,
       curr_state_index: 0,
     };
     res.root_state(0, State::new("default".to_owned()))

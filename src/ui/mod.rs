@@ -1,6 +1,6 @@
 mod key_event_ex;
 pub mod pager;
-mod state_machine;
+pub mod state_machine;
 mod status_bar;
 
 pub use key_event_ex::KeyEventEx;

@@ -1,5 +1,4 @@
 use crate::log::LogLine;
-use chrono::{DateTime, FixedOffset};
 
 /// 索引日志内容中的某一行日志，可以和日志内容的迭代器互相转换
 #[derive(PartialEq, Eq, Debug, Copy, Clone)]
@@ -66,15 +65,6 @@ impl Chunk {
     self.reversed
   }
 
-  /// 获得双向迭代器
-  fn iter(&'_ self) -> ChunkIter<'_, impl DoubleEndedIterator<Item = (usize, &LogLine)>> {
-    ChunkIter {
-      lines_iter: self.lines.iter().enumerate(),
-      reversed: self.reversed,
-      lines_count: self.lines.len(),
-    }
-  }
-
   /// 获取指定索引的数据
   fn get(&'_ self, i: usize) -> Option<&'_ LogLine> {
     self.lines.get(self.get_real_index(i))
@@ -99,67 +89,6 @@ impl Chunk {
     } else {
       i
     }
-  }
-}
-
-struct ChunkIter<'a, I>
-where
-  I: DoubleEndedIterator<Item = (usize, &'a LogLine)>,
-{
-  lines_iter: I,
-  reversed: bool,
-  lines_count: usize,
-}
-
-impl<'a, I> ChunkIter<'a, I>
-where
-  I: DoubleEndedIterator<Item = (usize, &'a LogLine)>,
-{
-  fn reverse_indexed_data(
-    lines_count: usize,
-    elem: Option<(usize, &'a LogLine)>,
-  ) -> Option<(usize, &'a LogLine)> {
-    match elem {
-      None => None,
-      Some((index, data)) => Some((lines_count - 1 - index, data)),
-    }
-  }
-}
-
-impl<'a, I> Iterator for ChunkIter<'a, I>
-where
-  I: DoubleEndedIterator<Item = (usize, &'a LogLine)>,
-{
-  type Item = (usize, &'a LogLine);
-
-  fn next(&mut self) -> Option<Self::Item> {
-    if self.reversed {
-      Self::reverse_indexed_data(self.lines_count, self.lines_iter.next_back())
-    } else {
-      self.lines_iter.next()
-    }
-  }
-}
-
-impl<'a, I> DoubleEndedIterator for ChunkIter<'a, I>
-where
-  I: DoubleEndedIterator<Item = (usize, &'a LogLine)>,
-{
-  fn next_back(&mut self) -> Option<Self::Item> {
-    if self.reversed {
-      Self::reverse_indexed_data(self.lines_count, self.lines_iter.next())
-    } else {
-      self.lines_iter.next_back()
-    }
-  }
-}
-
-impl<'a, I> ExactSizeIterator for ChunkIter<'a, I>
-where
-  I: DoubleEndedIterator<Item = (usize, &'a LogLine)>,
-{
-  fn len(&self) -> usize {
-    self.lines_count
   }
 }
 
@@ -225,64 +154,12 @@ impl LogFileContent {
     Chunk::new(self.chunk_capacity, reserved)
   }
 
-  /// 获得迭代器，支持双向搜索
-  fn iter(&'_ self) -> Iter<'_, impl DoubleEndedIterator<Item = (usize, &Chunk)>> {
-    Iter {
-      chunks_iter: self.chunks.iter().enumerate(),
-      chunk_index: 0,
-      lines_iter: None,
-    }
-  }
-
-  pub fn iter_forward_from<'a>(&self, index: Index) -> ForwardIter<'a> {
-    ForwardIter {
-      index,
-      data: self.unsafe_ref(),
-    }
-  }
-
-  pub fn iter_backward_from<'a>(&self, index: Index) -> BackwardIter<'a> {
-    BackwardIter {
-      index,
-      data: self.unsafe_ref(),
-    }
-  }
-
-  pub fn iter_forward_from_head<'a>(&self) -> ForwardIter<'a> {
-    self.iter_forward_from(self.first_index())
-  }
-
-  pub fn iter_backward_from_tail<'a>(&self) -> BackwardIter<'a> {
-    self.iter_backward_from(self.last_index())
-  }
-
-  pub fn iter_mut_forward_from<'a>(&mut self, index: Index) -> ForwardIterMut<'a> {
-    // ForwardIterMut { index, data: self }
-    ForwardIterMut {
-      index,
-      data: self.unsafe_mut_ref(),
-    }
-  }
-
-  pub fn iter_mut_backward_from<'a>(&mut self, index: Index) -> BackwardIterMut<'a> {
-    BackwardIterMut {
-      index,
-      data: self.unsafe_mut_ref(),
-    }
-  }
-
-  pub fn iter_mut_forward_from_head<'a>(&mut self) -> ForwardIterMut<'a> {
-    self.iter_mut_forward_from(self.first_index())
-  }
-
-  pub fn iter_mut_backward_from_tail<'a>(&'_ mut self) -> BackwardIterMut<'a> {
-    self.iter_mut_backward_from(self.last_index())
-  }
-
+  /// 获取指向第一条日志的索引
   pub fn first_index(&self) -> Index {
     Index::zero()
   }
 
+  /// 获取指向最后一条日志的索引
   pub fn last_index(&self) -> Index {
     let chunk_index = self.chunks.len().saturating_sub(1);
     let line_index = match self.chunks.get(chunk_index) {
@@ -292,12 +169,58 @@ impl LogFileContent {
     Index::new(chunk_index, line_index)
   }
 
-  fn unsafe_ref<'a>(&self) -> &'a Self {
-    unsafe { &*(self as *const LogFileContent) }
+  /// 将给定索引移动指定的步长。若移动结束时指向了有效的数据，则返回新的索引，
+  /// 若移动结束时发现索引越界，则返回剩余需要移动的步长。
+  pub fn step_index(&self, mut index: Index, mut n: isize) -> Result<Index, isize> {
+    // 获取当前索引的 chunk，如果不存在，则终止处理
+    let mut chunk = self.chunks.get(index.chunk_index).ok_or(n)?;
+
+    loop {
+      // 检查当前索引指向的条目在正确的数据范围内，如果否，则终止处理
+      let chunk_size = chunk.len();
+      if index.line_index >= chunk_size {
+        break Err(n);
+      }
+
+      // 若 n 为 0，则结束处理，已经找到指定的日志索引
+      if n == 0 {
+        break Ok(index);
+      }
+
+      // 尝试更新行索引（可能会超出 chunk 范围）
+      let next_line_index = index.line_index as isize + n;
+
+      if next_line_index < 0 {
+        // 若行超出 chunk 下界，则往前迭代 chunk，若没有前面已经没有 chunk，则终止处理
+        n = next_line_index + 1;
+        index.chunk_index = index.chunk_index.overflowing_sub(1).0;
+        chunk = self.chunks.get(index.chunk_index).ok_or(n)?;
+        index.line_index = chunk.len().saturating_sub(1);
+      } else if next_line_index >= chunk_size as isize {
+        // 若超出 chunk 上届，则往后迭代 chunk，若后边已经没有 chunk，则终止处理
+        n = next_line_index - chunk_size as isize;
+        index.chunk_index += 1;
+        index.line_index = 0;
+        chunk = self.chunks.get(index.chunk_index).ok_or(n)?;
+      } else {
+        // 移动之后刚好落在本 chunk 内，返回更新后的索引
+        index.line_index = next_line_index as usize;
+        break Ok(index);
+      }
+    }
   }
 
-  fn unsafe_mut_ref<'a>(&mut self) -> &'a mut Self {
-    unsafe { &mut *(self as *mut LogFileContent) }
+  /// 给定索引，获取日志行数据
+  pub fn get(&self, index: Index) -> Option<&LogLine> {
+    self.chunks.get(index.chunk_index)?.get(index.line_index)
+  }
+
+  /// 给定索引，获取可变的日志行数据
+  pub fn get_mut<'a>(&mut self, index: Index) -> Option<&'a mut LogLine> {
+    self
+      .chunks
+      .get_mut(index.chunk_index)?
+      .get_mut(index.line_index)
   }
 }
 
@@ -308,153 +231,8 @@ impl Default for LogFileContent {
   }
 }
 
-macro_rules! define_iterator {
-    ($name:ident $(, $mut_flag:tt)?) => {
-      pub struct $name<'a> {
-        index: Index,
-        data: &'a $($mut_flag)? LogFileContent,
-      }
-    };
-}
-
-/// 支持和索引互相转换的，一份日志文件内的正向迭代器
-macro_rules! forward_iterator {
-  ($name:ident, $get_func:ident $(, $mut_flag:tt)?) => {
-    define_iterator!($name $(, $mut_flag)?);
-
-    impl<'a> Iterator for $name<'a> {
-      type Item = (Index, &'a $($mut_flag)? LogLine);
-
-      fn next(&mut self) -> Option<Self::Item> {
-        match self.data.chunks.$get_func(self.index.chunk_index) {
-          None => None,
-          Some(chunk) => match chunk.$get_func(self.index.line_index) {
-            None => {
-              self.index.chunk_index += 1;
-              self.index.line_index = 0;
-              self.next()
-            }
-            Some(line) => {
-              let index = self.index;
-              self.index.line_index += 1;
-              Some((index, line))
-            }
-          },
-        }
-      }
-    }
-  };
-}
-
-forward_iterator!(ForwardIter, get);
-forward_iterator!(ForwardIterMut, get_mut, mut);
-
-/// 支持和索引互相转换的，一份日志文件内的逆向迭代器
-macro_rules! backward_iterator {
-  ($name:ident, $get_func:ident $(, $mut_flag:tt)?) => {
-    define_iterator!($name $(, $mut_flag)?);
-
-    impl<'a> Iterator for $name<'a> {
-      type Item = (Index, &'a $($mut_flag)? LogLine);
-
-      fn next(&mut self) -> Option<Self::Item> {
-        match self.data.chunks.$get_func(self.index.chunk_index) {
-          None => None,
-          Some(chunk) => match chunk.$get_func(self.index.line_index) {
-            None => match self.index.chunk_index.checked_sub(1) {
-              None => None,
-              Some(chunk_index) => {
-                self.index.chunk_index = chunk_index;
-                self.index.line_index = self.data.chunks[self.index.chunk_index]
-                  .len()
-                  .overflowing_sub(1)
-                  .0;
-                self.next()
-              }
-            },
-            Some(line) => {
-              let index = self.index;
-              self.index.line_index = self.index.line_index.overflowing_sub(1).0;
-              Some((index, line))
-            }
-          },
-        }
-      }
-    }
-  };
-}
-
-backward_iterator!(BackwardIter, get);
-backward_iterator!(BackwardIterMut, get_mut, mut);
-
-struct Iter<'a, EiChunk>
-where
-  EiChunk: DoubleEndedIterator<Item = (usize, &'a Chunk)>,
-{
-  chunks_iter: EiChunk,
-  chunk_index: usize,
-  lines_iter: Option<Box<dyn DoubleEndedIterator<Item = (usize, &'a LogLine)> + 'a>>,
-}
-
-impl<'a, EiChunk> Iterator for Iter<'a, EiChunk>
-where
-  EiChunk: DoubleEndedIterator<Item = (usize, &'a Chunk)>,
-{
-  type Item = (Index, &'a LogLine);
-
-  fn next(&mut self) -> Option<Self::Item> {
-    loop {
-      match self.lines_iter.as_mut() {
-        None => match self.chunks_iter.next() {
-          None => break None,
-          Some((chunk_index, chunk)) => {
-            self.lines_iter = Some(Box::new(chunk.iter()));
-            self.chunk_index = chunk_index;
-            continue;
-          }
-        },
-        Some(lines_iter) => match lines_iter.next() {
-          None => {
-            self.lines_iter = None;
-            continue;
-          }
-          Some((line_index, line)) => {
-            break Some((Index::new(self.chunk_index, line_index), line));
-          }
-        },
-      }
-    }
-  }
-}
-
-impl<'a, EiChunk> DoubleEndedIterator for Iter<'a, EiChunk>
-where
-  EiChunk: DoubleEndedIterator<Item = (usize, &'a Chunk)>,
-{
-  fn next_back(&mut self) -> Option<Self::Item> {
-    loop {
-      match self.lines_iter.as_mut() {
-        None => match self.chunks_iter.next_back() {
-          None => break None,
-          Some((chunk_index, chunk)) => {
-            self.lines_iter = Some(Box::new(chunk.iter()));
-            self.chunk_index = chunk_index;
-            continue;
-          }
-        },
-        Some(lines_iter) => match lines_iter.next_back() {
-          None => {
-            self.lines_iter = None;
-            continue;
-          }
-          Some((line_index, line)) => {
-            break Some((Index::new(self.chunk_index, line_index), line));
-          }
-        },
-      }
-    }
-  }
-}
+// 定义迭代器及其获取接口
+crate::define_all_iterators!(LogFileContent, Index);
 
 #[cfg(test)]
 mod tests {
@@ -467,44 +245,6 @@ mod tests {
     content.push_back(LogLine::new("bbb".to_string()));
     content.push_front(LogLine::new("222".to_string()));
     content.push_front(LogLine::new("111".to_string()));
-
-    let mut iter = content.iter();
-    assert_eq!(
-      iter.next(),
-      Some((Index::new(0, 0), &LogLine::new("111".to_string())))
-    );
-    assert_eq!(
-      iter.next(),
-      Some((Index::new(0, 1), &LogLine::new("222".to_string())))
-    );
-    assert_eq!(
-      iter.next(),
-      Some((Index::new(1, 0), &LogLine::new("aaa".to_string())))
-    );
-    assert_eq!(
-      iter.next(),
-      Some((Index::new(1, 1), &LogLine::new("bbb".to_string())))
-    );
-    assert_eq!(iter.next(), None);
-
-    let mut iter = content.iter();
-    assert_eq!(
-      iter.next_back(),
-      Some((Index::new(1, 1), &LogLine::new("bbb".to_string())))
-    );
-    assert_eq!(
-      iter.next_back(),
-      Some((Index::new(1, 0), &LogLine::new("aaa".to_string())))
-    );
-    assert_eq!(
-      iter.next_back(),
-      Some((Index::new(0, 1), &LogLine::new("222".to_string())))
-    );
-    assert_eq!(
-      iter.next_back(),
-      Some((Index::new(0, 0), &LogLine::new("111".to_string())))
-    );
-    assert_eq!(iter.next_back(), None);
 
     let mut iter = content.iter_forward_from(Index::new(0, 1));
     assert_eq!(
@@ -573,5 +313,31 @@ mod tests {
       Some((Index::new(0, 0), &LogLine::new("111".to_string())))
     );
     assert_eq!(iter.next(), None);
+
+    let mut iter = content.iter_forward_from_head();
+    assert_eq!(
+      iter.next_nth(2).ok(),
+      Some((Index::new(1, 0), &LogLine::new("aaa".to_string())))
+    );
+    assert_eq!(
+      iter.next(),
+      Some((Index::new(1, 1), &LogLine::new("bbb".to_string())))
+    );
+
+    let mut iter = content.iter_backward_from_tail();
+    assert_eq!(
+      iter.next_nth(2).ok(),
+      Some((Index::new(0, 1), &LogLine::new("222".to_string())))
+    );
+    assert_eq!(
+      iter.next(),
+      Some((Index::new(0, 0), &LogLine::new("111".to_string())))
+    );
+
+    let mut iter = content.iter_forward_from_head();
+    assert_eq!(iter.next_nth(6), Err(2));
+
+    let mut iter = content.iter_backward_from_tail();
+    assert_eq!(iter.next_nth(6), Err(2));
   }
 }

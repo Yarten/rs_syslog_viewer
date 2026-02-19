@@ -9,6 +9,7 @@ async fn test_log_hub() {
   let names = ["test", "user"];
   let root = common::get_test_root();
 
+  // 真值
   let mut true_content = names
     .iter()
     .map(|name| common::read_all_files_as_lines(&root, name))
@@ -18,6 +19,7 @@ async fn test_log_hub() {
   true_content.sort_by(LogLine::is_older);
   let true_reversed_content: Vec<LogLine> = true_content.iter().rev().cloned().collect();
 
+  // 测试核心功能，读取数据
   let mut log_hub = LogHub::open(
     root,
     names
@@ -34,6 +36,8 @@ async fn test_log_hub() {
   }
 
   let mut data = log_hub.data().await;
+
+  // 测试迭代器
   let content: Vec<LogLine> = common::collect_lines(data.iter_forward_from_head());
   let reversed_content: Vec<LogLine> = common::collect_lines(data.iter_backward_from_tail());
 

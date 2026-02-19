@@ -48,7 +48,7 @@ fn run(terminal: &mut DefaultTerminal) -> Result<()> {
       *quit_flag2.borrow_mut() = true;
     });
 
-  let mut sm = StateMachine::new(Duration::from_millis(100))
+  let mut sm = StateMachine::default()
     .root_state(IDLE_STATE, idle_state)
     .state(EDIT_STATE, edit_state)
     .state(QUIT_STATE, quit_state);

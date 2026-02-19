@@ -1,7 +1,9 @@
+use crate::app::StateBuilder;
+use crate::ui::State;
 use crate::{
-  app::{Controller, LogController, LogHub, LogPage},
+  app::{Controller, LogHub, controller::LogController, page::LogPage, state::LogNavigationState},
   log::Config as LogConfig,
-  ui::{Pager, StateMachine, pager::Theme as PagerTheme},
+  ui::{Pager, StateMachine, pager::Theme as PagerTheme, state_machine::Config as SmConfig},
 };
 use color_eyre::Result;
 use ratatui::DefaultTerminal;
@@ -20,6 +22,9 @@ pub struct Config {
 
   /// 页面整体的风格
   pub pager_theme: PagerTheme,
+
+  /// 状态机的配置
+  pub sm_config: SmConfig,
 }
 
 /// 日志可视化主体，也是该应用进程的启动入口
@@ -80,7 +85,11 @@ impl Viewer {
     let controllers: Vec<Rc<RefCell<dyn Controller>>> = vec![log_controller.clone()];
 
     // ------------------------------------------
-    // TODO: 构建状态
+    // 构建状态机与状态
+    let sm = Self::build_state_machine(
+      config.sm_config,
+      LogNavigationState::new(log_controller.clone()).build(),
+    );
 
     // ------------------------------------------
     // 构建页面
@@ -91,9 +100,16 @@ impl Viewer {
     Viewer {
       log_hub,
       pager,
-      sm: StateMachine::default(),
+      sm,
       controllers,
     }
+  }
+
+  /// 将各个业务状态结合起来，形成状态机
+  fn build_state_machine(sm_config: SmConfig, log_nav_state: State) -> StateMachine {
+    const LOG_NAV_STATE: usize = 1;
+
+    StateMachine::new(sm_config).root_state(LOG_NAV_STATE, log_nav_state)
   }
 
   /// 核心处理与渲染循环
