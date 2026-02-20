@@ -48,7 +48,14 @@ async fn test_rotated_log() {
   // 测试迭代器
   let content: Vec<LogLine> = common::collect_lines(log.iter_forward_from_head());
   let reversed_content: Vec<LogLine> = common::collect_lines(log.iter_backward_from_tail());
-  let tags: BTreeSet<String> = data_board.lock().await.get_tags().ordered().keys().cloned().collect();
+  let tags: BTreeSet<String> = data_board
+    .lock()
+    .await
+    .get_tags()
+    .ordered()
+    .keys()
+    .cloned()
+    .collect();
 
   assert_eq!(&content, &true_content);
   assert_eq!(&reversed_content, &true_reversed_content);

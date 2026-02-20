@@ -10,12 +10,12 @@ pub trait IterNextNth {
 /// 打破 rust 对引用的生命周期检查
 #[macro_export]
 macro_rules! unsafe_ref {
-    ($var_type:ty, $var:expr) => {
-      unsafe { & *(& *$var as *const $var_type) }
-    };
+  ($var_type:ty, $var:expr) => {
+    unsafe { &*(&*$var as *const $var_type) }
+  };
   ($var_type:ty, $var:expr, mut) => {
     unsafe { &mut *(&mut *$var as *mut $var_type) }
-  }
+  };
 }
 
 #[macro_export]

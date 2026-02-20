@@ -1,9 +1,10 @@
 use crate::{
-  app::{Controller, Index, LogHubRef, LogItem},
-  log::LogLine,
+  app::{Controller, Index, LogHubRef, then::Then},
+  log::LogLine, ui::{ViewPort as ViewPortBase, ViewPortEx},
 };
 use std::sync::Arc;
 use std::{collections::VecDeque, path::PathBuf};
+use crate::log::LogDirection;
 
 /// 展示区里维护的数据条目
 type Item = (Index, LogLine);
@@ -29,55 +30,17 @@ impl CursorEx for Option<&Item> {
 /// 维护日志展示区的数据
 #[derive(Default)]
 struct ViewPort {
-  /// 展示区的高度，也即能够展示的日志行数量
-  height: usize,
+  /// 展示区 UI 相关的数据
+  ui: ViewPortBase,
 
   /// 日志行，从前往后对应展示区的日志从上往下
   logs: VecDeque<Item>,
-
-  /// 光标位置，指的是相对于 height 中的定位
-  cursor: usize,
-
-  /// 光标数据索引，指的是相对于 logs 中的定位，
-  /// 它和 `cursor` 不一定重叠，特别是在新的一帧构建过程中，
-  /// 因此，每帧渲染获取数据的时候，将进行光标重定位
-  cursor_index: usize,
 }
 
+impl Then for ViewPortBase {}
+impl Then for ViewPort {}
+
 impl ViewPort {
-  /// 简单地进行支持级联调用
-  fn then<F, T>(&self, f: F) -> T
-  where
-    F: FnOnce() -> T,
-  {
-    (f)()
-  }
-
-  /// 设置展示区高度，同时钳制光标位置，防止越界
-  fn set_height(&mut self, height: usize) -> &mut Self {
-    self.height = height;
-    self.set_cursor(self.cursor);
-    self
-  }
-
-  /// 直接设置光标位置，需要钳制它，防止越界
-  fn set_cursor(&mut self, cursor: usize) -> &mut Self {
-    self.cursor = cursor.clamp(0, self.height.saturating_sub(1));
-    self
-  }
-
-  /// 将光标移动到展示区最顶部，和具体数据无关
-  fn set_cursor_at_top(&mut self) -> &mut Self {
-    self.cursor = 0;
-    self
-  }
-
-  /// 将光标移动到展示区最底部，和具体数据无关
-  fn set_cursor_at_bottom(&mut self) -> &mut Self {
-    self.cursor = self.height.saturating_sub(1);
-    self
-  }
-
   /// 顶部的数据
   fn top(&self) -> Option<&Item> {
     self.logs.front()
@@ -90,139 +53,49 @@ impl ViewPort {
 
   /// 获取光标指向的数据
   fn cursor(&self) -> Option<&Item> {
-    self.logs.get(self.cursor)
+    self.logs.get(self.ui.cursor())
   }
 
   /// 移动光标指定步长，并返回指向的数据（旧的，上一帧的内容）
   fn move_cursor(&mut self, steps: isize) -> Option<&Item> {
-    self.set_cursor((self.cursor as isize + steps).max(0) as usize);
-    self.logs.get(self.cursor)
+    self.ui.set_cursor((self.ui.cursor() as isize + steps).max(0) as usize);
+    self.logs.get(self.ui.cursor())
+  }
+
+  /// 根据已经配置好的光标位置，从指定索引处的日志开始填充数据区
+  fn fill(&mut self, data: &mut LogHubRef, index: Index) {
+    // 清除已有的数据
+    self.logs.clear();
+
+    // 从指定索引位置处，取出正向与逆向的迭代器
+    let (mut iter_down, mut iter_up) = data.iter_at(index);
+    iter_up.next(); // 光标位置默认用的 iter_down 迭代器插入，因此 iter_up 需要先跳过这一行。
+
+    // 使用 view port ui 的能力，逐一填充数据
+    self.ui.fill(
+      |dir| match dir {
+        LogDirection::Forward => match iter_down.next() {
+          None => false,
+          Some((index, log)) => {
+            self.logs.push_back((index, log.clone()));
+            true
+          }
+        }
+        LogDirection::Backward => match iter_up.next() {
+          None => false,
+          Some((index, log)) => {
+            self.logs.push_front((index, log.clone()));
+            true
+          }
+        }
+      }
+    )
   }
 }
 
-impl ViewPort {
-  /// 根据已经配置好的光标位置，从指定索引处的日志开始填充数据区，
-  /// 我们总是要求在条件允许的情况下，光标实际展示的位置不要过于接近底部或顶部
-  fn fill(&mut self, data: &mut LogHubRef, index: Index) {
-    // 首先先清空数据
-    self.logs.clear();
-    self.cursor_index = 0;
-
-    // 展示区高度为空时，结束处理
-    if self.height == 0 {
-      return;
-    }
-
-    // 获取数据迭代器，基于光标的所在的位置开始迭代
-    let (mut iter_down, mut iter_up) = data.iter_at(index);
-
-
-    // 先取出光标所在日志行。如果连光标指向的数据都不存在，则结束处理
-    match iter_down.next() {
-      None => return,
-      Some(x) => self.push_back(x),
-    }
-
-    // 光标往上区域的数据迭代器，需要跳过第一个数据（也即光标所在的数据）
-    let _ = iter_up.next();
-
-    // 光标离上下边界最少这么多行
-    let min_spacing = ((self.height as f64 * 0.2 + 1.0) as usize).min(5);
-
-    // 将光标限制在中间这个范围内
-    self.cursor = match (
-      self.ideal_count_up() >= min_spacing,
-      self.ideal_count_down() >= min_spacing,
-    ) {
-      // 光标离上边界过近，离下边界较远，那么将其向下调整
-      (false, true) => min_spacing,
-
-      // 光标离下边界过近，离上边界较远，那么将其向上调整
-      (true, false) => self.height - min_spacing,
-
-      // 光标处于中间，或者上下空间都不足，不移动光标
-      _ => self.cursor,
-    };
-
-    // 按现在光标的理想位置，开始取数据。可能某一端的数据其实没有那么多，我们将在后文从另外一端补充
-    self.push_some_front(&mut iter_up, self.ideal_count_up());
-    self.push_some_back(&mut iter_down, self.ideal_count_down());
-
-    // 检查上下两端的数据是否已经顶到头，如果某一端没有顶到头，则尝试从另外一边追加数据，
-    // 尽量保证数据展示区是满屏展示的。
-    // 也有可能两端的数据都不够，但已经都没有数据了，此时等于下方两个操作没有效果。
-    // 我们会在最终调整 cursor，使其对齐到它真正的位置上
-    let unfilled_spacing = self.height - self.logs.len();
-
-    // 顶部数据不够，底部来凑
-    if self.current_count_up() < self.ideal_count_up() {
-      self.push_some_back(&mut iter_down, unfilled_spacing);
-    }
-
-    // 底部数据不够，顶部来凑
-    if self.current_count_down() < self.ideal_count_down() {
-      self.push_some_front(&mut iter_up, unfilled_spacing);
-    }
-
-    // 更新光标的位置，和实际情况对齐
-    self.cursor = self.cursor_index;
-  }
-
-  /// 光标往上区域应有的日志数量，仅和当前光标位置有关
-  fn ideal_count_up(&self) -> usize {
-    self.cursor
-  }
-
-  /// 光标往下区域应有的日志数量，仅和当前光标位置有关
-  fn ideal_count_down(&self) -> usize {
-    self.height - self.cursor - 1
-  }
-
-  /// 实际情况下，光标往上区域的数据数量
-  fn current_count_up(&self) -> usize {
-    self.cursor_index
-  }
-
-  /// 实际情况下，光标往下区域的数据数量
-  fn current_count_down(&self) -> usize {
-    self.logs.len() - self.cursor_index - 1
-  }
-
-  /// 在光标之上的区域插入一些数据
-  fn push_some_front<'a, I>(&mut self, iter_up: &mut I, count: usize)
-  where
-    I: Iterator<Item = LogItem<'a>>,
-  {
-    for _ in 0..count {
-      match iter_up.next() {
-        None => break,
-        Some(x) => self.push_front(x),
-      }
-    }
-  }
-
-  /// 在光标之上的区域插入一些数据
-  fn push_some_back<'a, I>(&mut self, iter_down: &mut I, count: usize)
-  where
-    I: Iterator<Item = LogItem<'a>>,
-  {
-    for _ in 0..count {
-      match iter_down.next() {
-        None => break,
-        Some(x) => self.push_back(x),
-      }
-    }
-  }
-
-  /// 在最顶部插入数据
-  fn push_front(&mut self, x: LogItem) {
-    self.logs.push_front((x.0, x.1.clone()));
-    self.cursor_index += 1;
-  }
-
-  /// 在最底部插入数据
-  fn push_back(&mut self, x: LogItem) {
-    self.logs.push_back((x.0, x.1.clone()));
+impl ViewPortEx for ViewPort {
+  fn ui(&mut self) -> &mut ViewPortBase {
+    &mut self.ui
   }
 }
 
@@ -309,7 +182,7 @@ impl LogController {
 
   /// 光标所在的行索引
   pub fn cursor(&self) -> usize {
-    self.view_port.cursor
+    self.view_port.ui.cursor()
   }
 }
 
@@ -327,6 +200,7 @@ impl Controller for LogController {
 
       Control::Follow => self
         .view_port
+        .ui
         .set_cursor_at_bottom()
         .then(|| data.last_index()),
 
@@ -346,7 +220,10 @@ impl Controller for LogController {
     };
 
     // 基于当前的光标位置，及其指向的数据索引，填充整个展示区
-    self.view_port.fill(data, cursor_index);
+    self.view_port.fill(data, cursor_index.clone());
+
+    // 如果存在数据顶到头，触发更老的日志加载
+    data.try_load_older_logs(cursor_index);
 
     // 重置控制量
     match self.control {

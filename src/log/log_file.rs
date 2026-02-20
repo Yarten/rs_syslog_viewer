@@ -1,4 +1,4 @@
-use super::log_file_content::{LogFileContent};
+use super::log_file_content::LogFileContent;
 use crate::file::{
   Event, HeadReader, TailReader,
   reader::{self, Reader, ReaderBase},
@@ -6,10 +6,7 @@ use crate::file::{
 use crate::log::{DataBoard, Event as LogEvent, LogLine};
 use anyhow::Result;
 use enum_dispatch::enum_dispatch;
-use std::{
-  path::{PathBuf},
-  sync::Arc,
-};
+use std::{path::PathBuf, sync::Arc};
 use tokio::sync::Mutex;
 
 /// 不同类型的 reader

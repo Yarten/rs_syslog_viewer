@@ -1,6 +1,5 @@
-use rs_syslog_viewer::app::{LogHub};
+use rs_syslog_viewer::app::LogHub;
 use rs_syslog_viewer::log::{Config, LogLine};
-
 
 mod common;
 

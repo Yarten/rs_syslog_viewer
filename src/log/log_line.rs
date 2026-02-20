@@ -71,11 +71,11 @@ pub struct NormalLogLine {
 impl PartialEq for NormalLogLine {
   fn eq(&self, other: &Self) -> bool {
     self.timestamp == other.timestamp
-    && self.tag == other.tag
-    && self.pid == other.pid
-    && self.message == other.message
-    && self.label == other.label
-    && self.marked == other.marked
+      && self.tag == other.tag
+      && self.pid == other.pid
+      && self.message == other.message
+      && self.label == other.label
+      && self.marked == other.marked
   }
 }
 

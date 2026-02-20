@@ -451,11 +451,7 @@ where
   /// #         | +------------^
   /// #         +--------------^
   /// ```
-  fn fix_links_all_the_way(
-    &mut self,
-    end_index: Option<Index>,
-    mut farest_skip: usize,
-  ) {
+  fn fix_links_all_the_way(&mut self, end_index: Option<Index>, mut farest_skip: usize) {
     // 若之前记录的 link 就是有效的，则结束处理
     if self.is_link_valid(self.link) {
       return;
@@ -499,7 +495,11 @@ where
     // 循环处理过程中，因为始终找不到匹配的日志行，且 link 一直过期，
     // 而不断累积的无效日志行跳过步长，
     // 我们从本次迭代开始的 index 一直统计到遇到匹配的日志行、或者有效的 link 为止
-    let mut skip_sum = if self.chain_begin_is_known_as_invalid {1} else {0};
+    let mut skip_sum = if self.chain_begin_is_known_as_invalid {
+      1
+    } else {
+      0
+    };
 
     loop {
       // 本轮处理应该跳过的步长，取决于上一次访问时的元素的 link 是否有效，

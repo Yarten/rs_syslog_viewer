@@ -167,7 +167,9 @@ impl State {
     }
 
     match event.code {
-      KeyCode::Char(to_insert) => pager.status().enter_char(to_insert),
+      KeyCode::Char(to_insert) if !event.modifiers.contains(KeyModifiers::CONTROL) => {
+        pager.status().enter_char(to_insert)
+      }
       KeyCode::Backspace => pager.status().delete_char(),
       KeyCode::Left => pager.status().move_cursor_left(),
       KeyCode::Right => pager.status().move_cursor_right(),

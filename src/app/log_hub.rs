@@ -7,8 +7,8 @@ use std::{
   sync::Arc,
 };
 use tokio::{
-  task::{self, JoinHandle},
   sync::{Mutex, MutexGuard},
+  task::{self, JoinHandle},
 };
 use tokio_util::sync::CancellationToken;
 
@@ -157,11 +157,8 @@ impl<'a> LogHubDataGuard<'a> {
 
     Self {
       hub,
-      data: LogHubRef {
-        logs,
-        data_board
-      },
-      _data_board_guard: data_board_guard
+      data: LogHubRef { logs, data_board },
+      _data_board_guard: data_board_guard,
     }
   }
 }
@@ -193,7 +190,7 @@ pub type LogItem<'a> = (Index, &'a mut LogLine);
 /// 遍历处理所有日志文件，按时间顺序或逆序地逐一取出日志行
 pub struct Iter<'a, I, F>
 where
-  I: Iterator<Item=(LogIndex, &'a mut LogLine)>,
+  I: Iterator<Item = (LogIndex, &'a mut LogLine)>,
   F: Fn(&LogLine, &LogLine) -> Ordering,
 {
   iters: Vec<(I, Option<(LogIndex, &'a mut LogLine)>)>,
@@ -202,7 +199,7 @@ where
 
 impl<'a, I, F> Iterator for Iter<'a, I, F>
 where
-  I: Iterator<Item=(LogIndex, &'a mut LogLine)>,
+  I: Iterator<Item = (LogIndex, &'a mut LogLine)>,
   F: Fn(&LogLine, &LogLine) -> Ordering,
 {
   type Item = LogItem<'a>;
@@ -296,7 +293,13 @@ impl<'a> LogHubRef<'a> {
   }
 
   /// 获取指定索引处的迭代器，同时返回（正向，逆向）两种
-  pub fn iter_at(&'_ mut self, index: Index) -> (impl Iterator<Item = LogItem<'_>>, impl Iterator<Item = LogItem<'_>>) {
+  pub fn iter_at(
+    &'_ mut self,
+    index: Index,
+  ) -> (
+    impl Iterator<Item = LogItem<'_>>,
+    impl Iterator<Item = LogItem<'_>>,
+  ) {
     let forward_iter = crate::unsafe_ref!(LogHubRef, self, mut).iter_forward_from(index.clone());
     let backward_iter = crate::unsafe_ref!(LogHubRef, self, mut).iter_backward_from(index);
     (forward_iter, backward_iter)

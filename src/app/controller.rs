@@ -1,6 +1,7 @@
 use crate::app::LogHubRef;
 
 mod log_controller;
+mod tag_controller;
 
 /// 维护一个页面所需的操作接口、数据接口的逻辑控制器，实现 App 功能
 pub trait Controller {

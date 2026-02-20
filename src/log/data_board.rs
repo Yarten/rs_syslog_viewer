@@ -1,9 +1,6 @@
 use std::collections::HashMap;
 use std::sync::Arc;
-use std::{
-  collections::{BTreeMap},
-  path::{PathBuf},
-};
+use std::{collections::BTreeMap, path::PathBuf};
 
 /// 从日志中发现的标签集合，用于过滤日志，布尔值代表是否选中
 #[derive(Default)]
@@ -101,7 +98,7 @@ impl DataBoard {
   pub fn get_tags(&self) -> &TagsData {
     &self.tags
   }
-  
+
   /// 获取所有的额日志标签的容器，但是可以修改
   pub fn get_tags_mut(&mut self) -> &mut TagsData {
     &mut self.tags
