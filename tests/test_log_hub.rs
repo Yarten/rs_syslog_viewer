@@ -1,6 +1,6 @@
-use rs_syslog_viewer::app::{LogHub, LogHubData};
-use rs_syslog_viewer::log::{Config, Index, LogLine};
-use std::collections::BTreeSet;
+use rs_syslog_viewer::app::{LogHub};
+use rs_syslog_viewer::log::{Config, LogLine};
+
 
 mod common;
 
@@ -38,19 +38,19 @@ async fn test_log_hub() {
   let mut data = log_hub.data().await;
 
   // 测试迭代器
-  let content: Vec<LogLine> = common::collect_lines(data.iter_forward_from_head());
-  let reversed_content: Vec<LogLine> = common::collect_lines(data.iter_backward_from_tail());
+  let content: Vec<LogLine> = common::collect_mut_lines(data.iter_forward_from_head());
+  let reversed_content: Vec<LogLine> = common::collect_mut_lines(data.iter_backward_from_tail());
 
   assert_eq!(&content, &true_content);
   assert_eq!(&reversed_content, &true_reversed_content);
 
   // 测试可变的迭代器接口
-  for (_, log) in data.iter_mut_forward_from_head() {
+  for (_, log) in data.iter_forward_from_head() {
     log.toggle_mark();
   }
   for log in true_content.iter_mut() {
     log.toggle_mark();
   }
-  let content: Vec<LogLine> = common::collect_lines(data.iter_forward_from_head());
+  let content: Vec<LogLine> = common::collect_mut_lines(data.iter_forward_from_head());
   assert_eq!(&content, &true_content);
 }

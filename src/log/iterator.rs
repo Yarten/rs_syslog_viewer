@@ -7,6 +7,17 @@ pub trait IterNextNth {
   fn next_nth(&mut self, n: usize) -> Result<Self::Item, usize>;
 }
 
+/// 打破 rust 对引用的生命周期检查
+#[macro_export]
+macro_rules! unsafe_ref {
+    ($var_type:ty, $var:expr) => {
+      unsafe { & *(& *$var as *const $var_type) }
+    };
+  ($var_type:ty, $var:expr, mut) => {
+    unsafe { &mut *(&mut *$var as *mut $var_type) }
+  }
+}
+
 #[macro_export]
 macro_rules! iterator_base {
     ($name:ident, $index_type:ty, $data_type:ty, $get_func:ident $(, $mut_flag:tt)?) => {
@@ -164,11 +175,11 @@ macro_rules! define_all_iterators {
 
     impl $data_type {
       fn unsafe_ref<'a>(&self) -> &'a Self {
-        unsafe { &*(self as *const $data_type) }
+        crate::unsafe_ref!($data_type, self)
       }
 
       fn unsafe_mut_ref<'a>(&mut self) -> &'a mut Self {
-        unsafe { &mut *(self as *mut $data_type) }
+        crate::unsafe_ref!($data_type, self, mut)
       }
     }
   };

@@ -5,6 +5,6 @@ pub mod state;
 mod viewer;
 
 pub use controller::Controller;
-pub use log_hub::{Index, LogHub, LogHubData};
+pub use log_hub::{Index, LogHub, LogHubRef, LogItem};
 pub use state::StateBuilder;
 pub use viewer::{Config, Viewer};

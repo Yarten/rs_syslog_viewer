@@ -1,4 +1,4 @@
-use super::log_file_content::{BackwardIter, ForwardIter, Index, LogFileContent};
+use super::log_file_content::{LogFileContent};
 use crate::file::{
   Event, HeadReader, TailReader,
   reader::{self, Reader, ReaderBase},
@@ -7,10 +7,10 @@ use crate::log::{DataBoard, Event as LogEvent, LogLine};
 use anyhow::Result;
 use enum_dispatch::enum_dispatch;
 use std::{
-  collections::HashSet,
-  path::{Path, PathBuf},
+  path::{PathBuf},
   sync::Arc,
 };
+use tokio::sync::Mutex;
 
 /// 不同类型的 reader
 #[enum_dispatch(ReaderBase)]
@@ -59,34 +59,32 @@ impl LogFile {
   ///
   /// # Cancel Safety
   /// 本函数保证，当 await 被取消时，没有副作用。
-  pub async fn update(&mut self, data_board: Arc<DataBoard>) -> Option<Vec<LogEvent>> {
+  pub async fn update(&mut self, data_board: Arc<Mutex<DataBoard>>) -> Option<Vec<LogEvent>> {
     if let Some(events) = self.reader.changed().await {
       // 处理多个日志底层事件，消化掉内容新增事件，并向数据看板更新可能的新增标签，
       // 消化掉更名事件，
       // 如果是删除事件，则直接向调用者透传。
-      events
-        .into_iter()
-        .filter_map(|event| match event {
+      let mut result = vec![];
+      for event in events.into_iter() {
+        match event {
           Event::NewHead(s) => {
             let new_log = LogLine::new(s);
-            self.update_tag(&new_log, &data_board);
+            self.update_data_board(&new_log, &data_board).await;
             self.content.push_front(new_log);
-            None
           }
           Event::NewTail(s) => {
             let new_log = LogLine::new(s);
-            self.update_tag(&new_log, &data_board);
+            self.update_data_board(&new_log, &data_board).await;
             self.content.push_back(new_log);
-            None
           }
           Event::Renamed(new_path) => {
             self.path = new_path;
-            None
           }
-          Event::Removed => Some(LogEvent::Removed),
-        })
-        .collect::<Vec<LogEvent>>()
-        .into()
+          Event::Removed => result.push(LogEvent::Removed),
+        }
+      }
+
+      Some(result)
     } else {
       // 无法读到新的变更，代表本阅读器已经出错
       None
@@ -113,8 +111,9 @@ impl LogFile {
     &self.path
   }
 
-  /// 检查给定的新日志行，是否带来了新的、未知的日志标签
-  fn update_tag(&mut self, log: &LogLine, data_board: &DataBoard) {
+  /// 检查给定的新的日志行，将它的某些统计信息，刷新到全局的数据黑板中
+  async fn update_data_board(&mut self, log: &LogLine, data_board: &Mutex<DataBoard>) {
+    let mut data_board = data_board.lock().await;
     if let LogLine::Good(log) = log {
       data_board.update_tag(&log.tag);
     }

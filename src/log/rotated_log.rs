@@ -3,6 +3,7 @@ use crate::log::{
   log_file_content::Index as LogFileIndex,
 };
 use std::{collections::VecDeque, fs, path::PathBuf, sync::Arc};
+use tokio::sync::Mutex;
 
 /// 索引某一个系统日志中的某一行
 #[derive(Copy, Clone, PartialEq, Eq)]
@@ -88,7 +89,7 @@ impl RotatedLog {
   }
 
   /// 处理日志内容的变更、文件的滚动与删除
-  pub async fn update(&mut self, data_board: Arc<DataBoard>) {
+  pub async fn update(&mut self, data_board: Arc<Mutex<DataBoard>>) {
     // select 所有日志文件的事件
     let async_fns: Vec<_> = self
       .log_files

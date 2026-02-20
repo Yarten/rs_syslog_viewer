@@ -3,6 +3,7 @@ use rs_syslog_viewer::log::{Config, DataBoard, Index, IterNextNth, LogLine, Rota
 use std::collections::{BTreeSet, HashSet};
 use std::path::{Path, PathBuf};
 use std::sync::Arc;
+use tokio::sync::Mutex;
 use tokio::time::{Duration, Instant};
 
 mod common;
@@ -28,7 +29,7 @@ async fn test_rotated_log() {
   let true_tags: BTreeSet<String> = common::all_tags(&true_content);
 
   // 测试核心功能，读取数据
-  let data_board = Arc::new(DataBoard::default());
+  let data_board = Arc::new(Mutex::new(DataBoard::default()));
   let mut log = RotatedLog::new(log_path.clone(), Config::default());
 
   let start = Instant::now();
@@ -47,7 +48,7 @@ async fn test_rotated_log() {
   // 测试迭代器
   let content: Vec<LogLine> = common::collect_lines(log.iter_forward_from_head());
   let reversed_content: Vec<LogLine> = common::collect_lines(log.iter_backward_from_tail());
-  let tags: BTreeSet<String> = data_board.get_tags().ordered().keys().cloned().collect();
+  let tags: BTreeSet<String> = data_board.lock().await.get_tags().ordered().keys().cloned().collect();
 
   assert_eq!(&content, &true_content);
   assert_eq!(&reversed_content, &true_reversed_content);
@@ -97,7 +98,8 @@ async fn test_rotated_log() {
       let comb: HashSet<String> = comb.into_iter().cloned().collect();
 
       // 更新数据黑板中的标记记录
-      let mut tags = data_board.get_tags();
+      let mut data_board = data_board.lock().await;
+      let mut tags = data_board.get_tags_mut();
       tags.update_version();
 
       let all_tags: HashSet<String> = tags.ordered().keys().cloned().collect();

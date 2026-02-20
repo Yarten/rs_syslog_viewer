@@ -1,9 +1,8 @@
 use std::collections::HashMap;
 use std::sync::Arc;
 use std::{
-  collections::{BTreeMap, HashSet},
-  path::{Path, PathBuf},
-  sync::{Mutex, MutexGuard},
+  collections::{BTreeMap},
+  path::{PathBuf},
 };
 
 /// 从日志中发现的标签集合，用于过滤日志，布尔值代表是否选中
@@ -75,7 +74,7 @@ impl TagsData {
 #[derive(Default)]
 pub struct DataBoard {
   /// 日志的标签数据
-  tags: Mutex<TagsData>,
+  tags: TagsData,
 
   /// 日志文件所在的根目录
   log_files_root: Arc<PathBuf>,
@@ -92,16 +91,20 @@ impl DataBoard {
 
 impl DataBoard {
   /// 记录潜在可能得首次出现的日志标签
-  pub fn update_tag(&self, new_tag: &str) {
-    let mut tags = self.tags.lock().unwrap();
-    if !tags.contains(new_tag) {
-      tags.insert_new(new_tag);
+  pub fn update_tag(&mut self, new_tag: &str) {
+    if !self.tags.contains(new_tag) {
+      self.tags.insert_new(new_tag);
     }
   }
 
-  /// 获取所有的日志标签（有序）
-  pub fn get_tags(&'_ self) -> MutexGuard<'_, TagsData> {
-    self.tags.lock().unwrap()
+  /// 获取所有的日志标签的容器
+  pub fn get_tags(&self) -> &TagsData {
+    &self.tags
+  }
+  
+  /// 获取所有的额日志标签的容器，但是可以修改
+  pub fn get_tags_mut(&mut self) -> &mut TagsData {
+    &mut self.tags
   }
 
   /// 获取日志所在的根目录
@@ -117,7 +120,7 @@ mod tests {
 
   #[test]
   fn test_tags_data() {
-    let db = DataBoard::default();
+    let mut db = DataBoard::default();
     db.update_tag("test1");
     db.update_tag("test2");
     db.update_tag("test3");
@@ -130,13 +133,13 @@ mod tests {
     assert_eq!(db.get_tags().ordered_tags, true_tags);
     assert_eq!(db.get_tags().get("test2"), true);
 
-    db.get_tags().unset("test3");
+    db.get_tags_mut().unset("test3");
     assert_eq!(db.get_tags().get("test3"), false);
-    db.get_tags().set("test3");
+    db.get_tags_mut().set("test3");
     assert_eq!(db.get_tags().get("test3"), true);
-    db.get_tags().toggle("test3");
+    db.get_tags_mut().toggle("test3");
     assert_eq!(db.get_tags().get("test3"), false);
-    db.get_tags().toggle("test3");
+    db.get_tags_mut().toggle("test3");
     assert_eq!(db.get_tags().get("test3"), true);
   }
 }

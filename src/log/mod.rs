@@ -6,7 +6,7 @@ mod log_file_content;
 mod log_line;
 mod rotated_log;
 
-pub use data_board::DataBoard;
+pub use data_board::{DataBoard, TagsData};
 pub use event::Event;
 pub use iterator::IterNextNth;
 pub use log_file::LogFile;
