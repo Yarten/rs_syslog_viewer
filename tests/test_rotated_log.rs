@@ -1,5 +1,6 @@
-use rs_syslog_viewer::log::{Config, DataBoard, Index, LogLine, RotatedLog};
-use std::collections::BTreeSet;
+use itertools::Itertools;
+use rs_syslog_viewer::log::{Config, DataBoard, Index, IterNextNth, LogLine, RotatedLog};
+use std::collections::{BTreeSet, HashSet};
 use std::path::{Path, PathBuf};
 use std::sync::Arc;
 use tokio::time::{Duration, Instant};
@@ -46,7 +47,7 @@ async fn test_rotated_log() {
   // 测试迭代器
   let content: Vec<LogLine> = common::collect_lines(log.iter_forward_from_head());
   let reversed_content: Vec<LogLine> = common::collect_lines(log.iter_backward_from_tail());
-  let tags: BTreeSet<String> = data_board.get_tags().keys().cloned().collect();
+  let tags: BTreeSet<String> = data_board.get_tags().ordered().keys().cloned().collect();
 
   assert_eq!(&content, &true_content);
   assert_eq!(&reversed_content, &true_reversed_content);
@@ -85,6 +86,53 @@ async fn test_rotated_log() {
       }
       Err(_) => {
         assert_eq!(None, true_log);
+      }
+    }
+  }
+
+  // 测试过滤访问
+  for k in 0..=true_tags.len() {
+    for comb in true_tags.iter().combinations(k) {
+      // 本次选中的标签组合
+      let comb: HashSet<String> = comb.into_iter().cloned().collect();
+
+      // 更新数据黑板中的标记记录
+      let mut tags = data_board.get_tags();
+      tags.update_version();
+
+      let all_tags: HashSet<String> = tags.ordered().keys().cloned().collect();
+      for tag in all_tags {
+        if comb.contains(&tag) {
+          tags.set(&tag);
+        } else {
+          tags.unset(&tag);
+        }
+      }
+
+      // 构建真值
+      let true_filtered_content: Vec<LogLine> = true_content
+        .iter()
+        .filter_map(|l| match l.get_tag() {
+          None => Some(l),
+          Some(tag) => match comb.contains(tag) {
+            false => None,
+            true => Some(l),
+          },
+        })
+        .cloned()
+        .collect();
+      let true_reversed_filtered_content: Vec<LogLine> =
+        true_filtered_content.iter().rev().cloned().collect();
+
+      // 分析遍历结果是否正确，每次遍历都至少进行两次，第一次没有缓存、之后都有缓存
+      for _ in 0..3 {
+        let filtered_content: Vec<LogLine> =
+          common::collect_mut_lines(log.filtered_iter_forward_from_head(&tags));
+        assert_eq!(filtered_content, true_filtered_content);
+
+        let filtered_content: Vec<LogLine> =
+          common::collect_mut_lines(log.filtered_iter_backward_from_tail(&tags));
+        assert_eq!(filtered_content, true_reversed_filtered_content);
       }
     }
   }

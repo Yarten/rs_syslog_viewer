@@ -6,8 +6,9 @@ use lazy_static::lazy_static;
 use std::cmp::Ordering;
 
 /// 日志内容标签
-#[derive(PartialEq, Debug, Clone)]
+#[derive(PartialEq, Debug, Clone, Default)]
 pub enum Label {
+  #[default]
   Unknown,
   Debug,
   Info,
@@ -15,8 +16,32 @@ pub enum Label {
   Error,
 }
 
+/// 日志遍历的方向，主要用于描述 LogLink 的方向
+#[derive(Clone, Copy)]
+pub enum LogDirection {
+  /// 正向遍历，也即从旧到新
+  Forward,
+
+  /// 逆向遍历，也即从新到旧
+  Backward,
+}
+
+/// 在有序的遍历序列中，用于快速跳转的“软链接”，使用相对差距进行定义。
+///
+/// 在迭代过程中，我们希望跳过某些不符合 tag 过滤规则的日志，为了防止每次
+/// 遍历都得进行大量无效迭代和条件判断，遂设计这么一个链接数据结构体，
+/// 用于缓存之前的分析结果。
+#[derive(Default, Debug, PartialEq, Copy, Clone)]
+pub struct LogLink {
+  /// 版本号，用于标识该链接是否有效
+  pub ver: usize,
+
+  /// 从本日志行跳转到下一条日志行，还需要跳过多少步长
+  pub skip: usize,
+}
+
 /// 来自 syslog 的日志行
-#[derive(PartialEq, Debug, Clone)]
+#[derive(Debug, Clone, Default)]
 pub struct NormalLogLine {
   /// 日志的产生时间
   pub timestamp: DateTime<FixedOffset>,
@@ -35,10 +60,27 @@ pub struct NormalLogLine {
 
   /// 标记该日志是否被 marked，用于 viewer 快速定位
   pub marked: bool,
+
+  /// 正向迭代的跳转链接
+  pub forward_link: LogLink,
+
+  /// 逆向迭代的跳转链接
+  pub backward_link: LogLink,
+}
+
+impl PartialEq for NormalLogLine {
+  fn eq(&self, other: &Self) -> bool {
+    self.timestamp == other.timestamp
+    && self.tag == other.tag
+    && self.pid == other.pid
+    && self.message == other.message
+    && self.label == other.label
+    && self.marked == other.marked
+  }
 }
 
 /// 无法解析的日志行
-#[derive(PartialEq, Debug, Clone)]
+#[derive(PartialEq, Debug, Clone, Default)]
 pub struct BrokenLogLine {
   /// 内容
   pub content: String,
@@ -84,7 +126,7 @@ impl LogLine {
     } else {
       LogLine::Bad(BrokenLogLine {
         content: line,
-        marked: false,
+        ..Default::default()
       })
     }
   }
@@ -177,12 +219,12 @@ impl LogLine {
       tag,
       pid,
       message,
-      label: Label::Unknown,
-      marked: false,
+      ..Default::default()
     })
   }
 }
 
+/// 将字符串解析为日志行数据的字节串分析器
 struct BytesSeeker<'a> {
   bytes: &'a [u8],
 }
@@ -259,6 +301,36 @@ impl LogLine {
     match self {
       Good(log) => log.marked = !log.marked,
       Bad(log) => log.marked = !log.marked,
+    }
+  }
+
+  /// 获取本行日志目标遍历方向的下一跳信息
+  pub fn get_link(&self, direction: LogDirection) -> LogLink {
+    match self {
+      Good(log) => match direction {
+        LogDirection::Forward => log.forward_link,
+        LogDirection::Backward => log.backward_link,
+      },
+      Bad(_) => LogLink::default(),
+    }
+  }
+
+  /// 设置本日志行新的下一跳信息
+  pub fn set_link(&mut self, direction: LogDirection, new_link: LogLink) {
+    match self {
+      Good(log) => match direction {
+        LogDirection::Forward => log.forward_link = new_link,
+        LogDirection::Backward => log.backward_link = new_link,
+      },
+      Bad(_) => {}
+    }
+  }
+
+  /// 获取日志的标签
+  pub fn get_tag(&self) -> Option<&str> {
+    match self {
+      Good(log) => Some(&log.tag),
+      Bad(_) => None,
     }
   }
 }

@@ -1,4 +1,4 @@
-use crate::log::LogLine;
+use crate::log::{IterNextNth, LogLine};
 
 /// 索引日志内容中的某一行日志，可以和日志内容的迭代器互相转换
 #[derive(PartialEq, Eq, Debug, Copy, Clone)]

@@ -8,6 +8,7 @@ mod rotated_log;
 
 pub use data_board::DataBoard;
 pub use event::Event;
+pub use iterator::IterNextNth;
 pub use log_file::LogFile;
-pub use log_line::{BrokenLogLine, LogLine, NormalLogLine};
+pub use log_line::{BrokenLogLine, LogDirection, LogLine, LogLink, NormalLogLine};
 pub use rotated_log::{Config, Index, RotatedLog};

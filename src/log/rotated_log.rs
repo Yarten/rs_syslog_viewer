@@ -1,13 +1,7 @@
-use crate::log::log_file_content::LogFileContent;
 use crate::log::{
-  DataBoard, Event, LogFile, LogLine,
-  log_file_content::{
-    BackwardIter as LogFileBackwardIter, BackwardIterMut as LogFileBackwardIterMut,
-    ForwardIter as LogFileForwardIter, ForwardIterMut as LogFileForwardIterMut,
-    Index as LogFileIndex,
-  },
+  DataBoard, Event, IterNextNth, LogDirection, LogFile, LogLine, LogLink, data_board::TagsData,
+  log_file_content::Index as LogFileIndex,
 };
-use log::Log;
 use std::{collections::VecDeque, fs, path::PathBuf, sync::Arc};
 
 /// 索引某一个系统日志中的某一行
@@ -349,3 +343,266 @@ impl RotatedLog {
 
 // 定义迭代器以及获取接口
 crate::define_all_iterators!(RotatedLog, Index);
+
+type ItemMut<'a> = (Index, &'a mut LogLine);
+
+/// 带有标签过滤功能的迭代器，会在遍历过程中，建立缓存的快速跳转链路
+pub struct FilteredIter<'a, 'b, I>
+where
+  I: Iterator<Item = ItemMut<'a>> + IterNextNth<Item = ItemMut<'a>>,
+{
+  data: &'a mut RotatedLog,
+  iter: I,
+  tags: &'b TagsData,
+  index: Index,
+  link: LogLink,
+
+  /// 用于标记记录中的 index 及其 link 是否是已知无效的，
+  /// 1. 在遍历开始时，是未知的；
+  /// 2. 在遍历中间，跳转到有效日志行上，更新了记录时，是已知有效的；
+  /// 3. 在遍历中间，跳转到匹配、但链接无效的日志行，虽然更新了记录，但是是已知无效的。
+  /// 在遇到下一个有效日志行、或者遍历结束时，会从 index
+  chain_begin_is_known_as_invalid: bool,
+}
+
+/// 用于特化取出指定索引开始遍历的迭代器（可能是正向，也可能是逆向）
+pub trait IterFrom<'a> {
+  type Iter: Iterator<Item = ItemMut<'a>>;
+
+  fn data_iter_from(data: &mut RotatedLog, index: Index) -> Self::Iter;
+
+  fn direction(&self) -> LogDirection;
+}
+
+impl<'a, 'b> IterFrom<'a> for FilteredIter<'a, 'b, ForwardIterMut<'a>> {
+  type Iter = ForwardIterMut<'a>;
+
+  fn data_iter_from(data: &mut RotatedLog, index: Index) -> Self::Iter {
+    data.iter_mut_forward_from(index)
+  }
+
+  fn direction(&self) -> LogDirection {
+    LogDirection::Forward
+  }
+}
+
+impl<'a, 'b> IterFrom<'a> for FilteredIter<'a, 'b, BackwardIterMut<'a>> {
+  type Iter = BackwardIterMut<'a>;
+
+  fn data_iter_from(data: &mut RotatedLog, index: Index) -> Self::Iter {
+    data.iter_mut_backward_from(index)
+  }
+
+  fn direction(&self) -> LogDirection {
+    LogDirection::Backward
+  }
+}
+
+impl<'a, 'b, I> FilteredIter<'a, 'b, I>
+where
+  I: Iterator<Item = ItemMut<'a>> + IterNextNth<Item = ItemMut<'a>>,
+  Self: IterFrom<'a, Iter = I>,
+{
+  fn new(data: &'a mut RotatedLog, tags: &'b TagsData, index: Index) -> Self {
+    let iter = Self::data_iter_from(data, index);
+    Self {
+      data,
+      iter,
+      tags,
+      index,
+      link: LogLink::default(),
+      chain_begin_is_known_as_invalid: false,
+    }
+  }
+
+  /// 检查给定的 link 是否有效
+  fn is_link_valid(&self, link: LogLink) -> bool {
+    self.tags.get_version() == link.ver
+  }
+
+  /// 检查指定日志是否被过滤
+  fn is_filtered(&self, log: &LogLine) -> bool {
+    match log.get_tag() {
+      None => false,
+      Some(tag) => !self.tags.get(tag),
+    }
+  }
+
+  /// 从之前记录的（也即是上一次有效记录的第一跳无效记录）的日志行，
+  /// 一路到给定的日志行为止（不包含该日志行），更新它们 link，使之指向本日志行指向的日志
+  ///
+  /// 以下是示意图：
+  /// 1. 第一个 v 是上一次记录的有效数据，中间的 x 代表多次循环中找到的无效记录；
+  /// 2. 第二个 v 是本次找到的有效记录，它的 link 指向了下一跳。
+  ///
+  /// ```
+  /// #  -------!       -------!
+  /// # |v|....|x|x|x|x|v|....|?|
+  /// ```
+  ///
+  /// 接下来，我们将所有的 x 的 link 都更新正确，使它们指向新发现的有效日志，指向的日志：
+  ///
+  /// ```
+  /// #  +------!       +------!
+  /// # |v|....|x|x|x|x|v|....|?|
+  /// #         | | | +--------^
+  /// #         | | +----------^
+  /// #         | +------------^
+  /// #         +--------------^
+  /// ```
+  fn fix_links_all_the_way(
+    &mut self,
+    end_index: Option<Index>,
+    mut farest_skip: usize,
+  ) {
+    // 若之前记录的 link 就是有效的，则结束处理
+    if self.is_link_valid(self.link) {
+      return;
+    }
+
+    // 从之前的索引位置一路更新到当前索引为止
+    for (index, log) in Self::data_iter_from(self.data, self.index) {
+      if Some(index) == end_index {
+        break;
+      }
+
+      log.set_link(
+        self.direction(),
+        LogLink {
+          ver: self.tags.get_version(),
+          skip: farest_skip,
+        },
+      );
+
+      // 随着离当前有效索引越来越近，要逐步缩短步长
+      farest_skip -= 1;
+    }
+  }
+
+  /// 记录新的起点索引及其跳转链接，基于这一行日志开始往后跳转、或者重铸跳转链
+  fn begin_new_chain(&mut self, index: Index, log: &LogLine) {
+    self.link = log.get_link(self.direction());
+    self.index = index;
+    self.chain_begin_is_known_as_invalid = !self.is_link_valid(self.link);
+  }
+}
+
+impl<'a, 'b, I> Iterator for FilteredIter<'a, 'b, I>
+where
+  I: Iterator<Item = ItemMut<'a>> + IterNextNth<Item = ItemMut<'a>>,
+  Self: IterFrom<'a, Iter = I>,
+{
+  type Item = ItemMut<'a>;
+
+  fn next(&mut self) -> Option<Self::Item> {
+    // 循环处理过程中，因为始终找不到匹配的日志行，且 link 一直过期，
+    // 而不断累积的无效日志行跳过步长，
+    // 我们从本次迭代开始的 index 一直统计到遇到匹配的日志行、或者有效的 link 为止
+    let mut skip_sum = if self.chain_begin_is_known_as_invalid {1} else {0};
+
+    loop {
+      // 本轮处理应该跳过的步长，取决于上一次访问时的元素的 link 是否有效，
+      // 如果有效，则取它记录的 skip，否则取零（也即不跳过任何数据，取下一个进行分析）
+      let skip = if self.is_link_valid(self.link) {
+        // 由于实际上这个 skip 代表的是上一个元素的，因此从当前元素进行跳转时，步长得 -1
+        self.link.skip.saturating_sub(1)
+      } else {
+        0
+      };
+
+      // 取出下一跳的日志
+      let curr_item = self.iter.next_nth(skip).ok();
+
+      // 如果已经取不到数据，说明已经访问到末尾，我们需要刷新此前所有无效日志行，
+      // 让它们的 link 指向一个越界的值，保证下次迭代可以快速结束。
+      if curr_item.is_none() {
+        self.fix_links_all_the_way(None, skip_sum); // 注意，如果此时 iter 再次被误用，可能会导致链接错误
+        return None;
+      }
+
+      // 解包内容
+      let (index, log) = curr_item?;
+
+      // 若上一个元素的 link 是有效的，那么之后的 link 更新处理都从新元素开始
+      if self.is_link_valid(self.link) {
+        self.begin_new_chain(index, log);
+      }
+
+      // 检查本日志是否被过滤掉。如果没有被过滤掉，那么刷新此前所有无效日志行，让它们的 link 指向本日志，
+      // 同时，之后的链路跳转从本日志重新开始建设，
+      // 最后，返回本日志
+      if !self.is_filtered(log) {
+        self.fix_links_all_the_way(Some(index), skip_sum);
+        self.begin_new_chain(index, log);
+        break Some((index, log));
+      }
+
+      // 本行日志被过滤掉，还需要继续寻找下一跳日志
+      // 检查该日志的 link 是否有效，如果有效，则刷新之前所有无效日志行的 link
+      let next_link = log.get_link(self.direction());
+
+      if self.is_link_valid(next_link) {
+        // +1 是因为本日志也是无效的，需要跳过，统计在其中。
+        self.fix_links_all_the_way(Some(index), skip_sum + 1 + next_link.skip);
+        self.begin_new_chain(index, log);
+
+        // 从本条日志开始，重新建立 link，虽然本条日志不匹配过滤规则，但是可以用于缩短遍历路径，
+        // 事实上，这种情况比较少见，也即：处于快速跳转路径中，而日志规则又不匹配，
+        // 可能会出现在随机开始的第一次遍历里，从这一次跳转到正确的快速路径上后，应该一路命中的都是正确的日志行
+        skip_sum = 0;
+      } else {
+        // 本条日志 link 无效（当 tags 发生变更时，会让所有 link 无效），则继续下一次遍历寻找。
+        // 由于此前的步骤，现在记录的 link 一定是无效的，换句话说，下一个处理循环中，只会向前走一步
+        skip_sum += 1;
+      }
+    }
+  }
+}
+
+impl RotatedLog {
+  /// 获取从指定索引出发的、带有标签过滤功能的正向迭代器
+  pub fn filtered_iter_forward_from<'a, 'b>(
+    &'a mut self,
+    tags: &'b TagsData,
+    index: Index,
+  ) -> FilteredIter<'a, 'b, ForwardIterMut<'a>>
+  where
+    'b: 'a,
+  {
+    FilteredIter::new(self, tags, index)
+  }
+
+  /// 获取从指定索引出发的、带有标签过滤功能的逆向迭代器
+  pub fn filtered_iter_backward_from<'a, 'b>(
+    &'a mut self,
+    tags: &'b TagsData,
+    index: Index,
+  ) -> FilteredIter<'a, 'b, BackwardIterMut<'a>>
+  where
+    'b: 'a,
+  {
+    FilteredIter::new(self, tags, index)
+  }
+
+  /// 获取从头部出发的、带有标签过滤功能的正向迭代器
+  pub fn filtered_iter_forward_from_head<'a, 'b>(
+    &'a mut self,
+    tags: &'b TagsData,
+  ) -> FilteredIter<'a, 'b, ForwardIterMut<'a>>
+  where
+    'b: 'a,
+  {
+    self.filtered_iter_forward_from(tags, self.first_index())
+  }
+
+  /// 获取从尾部出发的、带有标签过滤功能的逆向迭代器
+  pub fn filtered_iter_backward_from_tail<'a, 'b>(
+    &'a mut self,
+    tags: &'b TagsData,
+  ) -> FilteredIter<'a, 'b, BackwardIterMut<'a>>
+  where
+    'b: 'a,
+  {
+    self.filtered_iter_backward_from(tags, self.last_index())
+  }
+}

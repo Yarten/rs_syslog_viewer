@@ -1379,6 +1379,7 @@ dependencies = [
  "crossterm",
  "enum_dispatch",
  "futures",
+ "itertools",
  "lazy_static",
  "log",
  "notify",

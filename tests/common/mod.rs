@@ -34,6 +34,10 @@ pub fn collect_lines<'a, I>(i: impl Iterator<Item = (I, &'a LogLine)>) -> Vec<Lo
   i.map(|(_, line)| line.clone()).collect()
 }
 
+pub fn collect_mut_lines<'a, I>(i: impl Iterator<Item = (I, &'a mut LogLine)>) -> Vec<LogLine> {
+  i.map(|(_, line)| line.clone()).collect()
+}
+
 pub fn read_all_files_as_lines(root: &Path, name: &str) -> Option<Vec<LogLine>> {
   let log_name = name.to_string() + ".log";
   let mut log_paths: BTreeSet<PathBuf> = BTreeSet::new();

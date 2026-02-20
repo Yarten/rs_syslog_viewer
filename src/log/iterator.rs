@@ -1,5 +1,12 @@
 use crate::log::LogLine;
 
+pub trait IterNextNth {
+  type Item;
+
+  /// 取出跳过了若干步长后的元素，如果取出失败，返回还有多少剩余步长
+  fn next_nth(&mut self, n: usize) -> Result<Self::Item, usize>;
+}
+
 #[macro_export]
 macro_rules! iterator_base {
     ($name:ident, $index_type:ty, $data_type:ty, $get_func:ident $(, $mut_flag:tt)?) => {
@@ -28,7 +35,10 @@ macro_rules! iterator_base {
         }
       }
 
-      impl<'a> Iterator for $name<'a> {
+      impl<'a> Iterator for $name<'a>
+      where
+        Self: crate::log::iterator::IterNextNth<Item = ($index_type, &'a $($mut_flag)? LogLine)>,
+      {
         type Item = ($index_type, &'a $($mut_flag)? LogLine);
 
         fn next(&mut self) -> Option<Self::Item> {
@@ -118,8 +128,10 @@ macro_rules! forward_iterator {
       crate::iterator_base!($name, $index_type, $data_type, $get_func $(, $mut_flag)?);
       crate::forward_iterator_func!($name, $index_type, $data_type  $(, $mut_flag)?);
 
-      impl<'a> $name<'a> {
-        pub fn next_nth(&mut self, n: usize) -> Result<($index_type, &'a $($mut_flag)? LogLine), usize> {
+      impl<'a> crate::log::iterator::IterNextNth for $name<'a> {
+        type Item = ($index_type, &'a $($mut_flag)? LogLine);
+
+         fn next_nth(&mut self, n: usize) -> Result<Self::Item, usize> {
           self.do_next_nth(n as isize, 1)
         }
       }
@@ -132,8 +144,10 @@ macro_rules! backward_iterator {
       crate::iterator_base!($name, $index_type, $data_type, $get_func $(, $mut_flag)?);
       crate::backward_iterator_func!($name, $index_type, $data_type  $(, $mut_flag)?);
 
-      impl<'a> $name<'a> {
-        pub fn next_nth(&mut self, n: usize) -> Result<($index_type, &'a $($mut_flag)? LogLine), usize> {
+      impl<'a> crate::log::iterator::IterNextNth for $name<'a> {
+        type Item = ($index_type, &'a $($mut_flag)? LogLine);
+
+        fn next_nth(&mut self, n: usize) -> Result<Self::Item, usize> {
           self.do_next_nth(-(n as isize), -1)
         }
       }
