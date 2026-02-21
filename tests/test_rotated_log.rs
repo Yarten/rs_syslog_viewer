@@ -52,7 +52,7 @@ async fn test_rotated_log() {
     .lock()
     .await
     .get_tags()
-    .ordered()
+    .all()
     .keys()
     .cloned()
     .collect();
@@ -109,7 +109,7 @@ async fn test_rotated_log() {
       let mut tags = data_board.get_tags_mut();
       tags.update_version();
 
-      let all_tags: HashSet<String> = tags.ordered().keys().cloned().collect();
+      let all_tags: HashSet<String> = tags.all().keys().cloned().collect();
       for tag in all_tags {
         if comb.contains(&tag) {
           tags.set(&tag);

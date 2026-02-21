@@ -1,6 +1,6 @@
 use crate::{
   app::{StateBuilder, controller::LogController},
-  ui::{KeyEventEx, State},
+  ui::{KeyEventEx, State, ViewPortController},
 };
 use crossterm::event::{KeyCode, KeyEvent};
 use std::{cell::RefCell, rc::Rc};
@@ -35,12 +35,18 @@ impl LogNavigationState {
 impl StateBuilder for LogNavigationState {
   fn build(self) -> State {
     self
-      .action(KeyEvent::simple(KeyCode::Up), |ctrl| ctrl.move_by_steps(-1))
-      .action(KeyEvent::simple(KeyCode::Down), |ctrl| {
-        ctrl.move_by_steps(1)
+      .action(KeyEvent::simple(KeyCode::Up), |ctrl| {
+        ctrl.view_mut().want_move_cursor(-1)
       })
-      .action(KeyEvent::simple(KeyCode::PageUp), |ctrl| ctrl.page_up())
-      .action(KeyEvent::simple(KeyCode::PageDown), |ctrl| ctrl.page_down())
+      .action(KeyEvent::simple(KeyCode::Down), |ctrl| {
+        ctrl.view_mut().want_move_cursor(1)
+      })
+      .action(KeyEvent::simple(KeyCode::PageUp), |ctrl| {
+        ctrl.view_mut().want_page_up()
+      })
+      .action(KeyEvent::simple(KeyCode::PageDown), |ctrl| {
+        ctrl.view_mut().want_page_down()
+      })
       .state
   }
 }

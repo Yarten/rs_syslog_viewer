@@ -37,7 +37,7 @@ async fn test_log_file() {
     .lock()
     .await
     .get_tags()
-    .ordered()
+    .all()
     .keys()
     .cloned()
     .collect();

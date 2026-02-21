@@ -1,4 +1,25 @@
 use crate::log::LogDirection;
+use std::collections::VecDeque;
+
+/// 描述本帧内的控制
+#[derive(Default, Copy, Clone)]
+pub enum Control {
+  /// 没有动作，光标将停在上一帧的位置
+  #[default]
+  Idle,
+
+  /// 跟随最新日志
+  Follow,
+
+  /// 逐步移动日志
+  MoveBySteps(isize),
+
+  /// 往上翻页
+  PageUp,
+
+  /// 往下翻页
+  PageDown,
+}
 
 #[derive(Default)]
 pub struct ViewPort {
@@ -17,27 +38,139 @@ pub struct ViewPort {
   data_count: usize,
 }
 
+pub trait CursorEx {
+  type Key;
+  type Value;
+
+  fn key(self) -> Option<Self::Key>;
+
+  fn key_or(self, fallback: impl Fn() -> Self::Key) -> Self::Key
+  where
+    Self: Sized,
+  {
+    self.key().unwrap_or(fallback())
+  }
+}
+
 pub trait ViewPortEx {
-  fn ui(&mut self) -> &mut ViewPort;
+  /// 展示区每一行的数据内容
+  type Item;
 
-  fn set_height(&mut self, height: usize) -> &mut Self {
-    self.ui().set_height(height);
-    self
+  /// 获取管理 UI 的数据
+  fn ui_mut(&mut self) -> &mut ViewPort;
+  fn ui(&self) -> &ViewPort;
+
+  /// 获取用户数据
+  fn data_mut(&mut self) -> &mut VecDeque<Self::Item>;
+  fn data(&self) -> &VecDeque<Self::Item>;
+
+  /// 获取控制量
+  fn control_mut(&mut self) -> &mut Control;
+  fn control(&self) -> Control;
+
+  /// 在已有的数据范围内，应用本帧的控制，返回光标最终指向的数据，
+  /// 一般返回的是上一帧的旧数据
+  fn apply(&mut self) -> Option<&Self::Item> {
+    let control = self.control();
+
+    // 重置控制量
+    match control {
+      Control::Follow => {}
+      _ => *self.control_mut() = Control::Idle,
+    }
+
+    // 响应控制
+    match control {
+      // 光标保持不动，返回光标指向的数据
+      Control::Idle => self.data().get(self.ui().cursor()),
+
+      // 将光标拉到最顶部，跟踪最新的数据。由于本类记录的数据是落后的，并不知道最新是什么数据，因此这里返回 None
+      Control::Follow => {
+        self.ui_mut().set_cursor_at_bottom();
+        None
+      }
+
+      // 移动光标，返回光标指向的数据
+      Control::MoveBySteps(n) => {
+        let cursor = (self.ui().cursor() as isize + n).max(0) as usize;
+        self.ui_mut().set_cursor(cursor);
+        self.data().get(self.ui().cursor())
+      }
+
+      // 向上翻页，光标置顶，返回视野里最顶层的数据，这样一来，视野里的顶层数据就会在底层
+      Control::PageUp => {
+        self.ui_mut().set_cursor_at_bottom();
+        self.data().front()
+      }
+
+      // 向下翻页，光标置底，返回视野里最底层的数据，这样一来，视野里的底层数据就会在顶层
+      Control::PageDown => {
+        self.ui_mut().set_cursor_at_top();
+        self.data().back()
+      }
+    }
   }
 
-  fn set_cursor(&mut self, cursor: usize) -> &mut Self {
-    self.ui().set_cursor(cursor);
-    self
+  /// 填充数据的辅助函数
+  fn do_fill<F>(&mut self, mut f: F)
+  where
+    F: FnMut(LogDirection) -> Option<Self::Item>,
+  {
+    // 分开引用两部分的数据进行操作，不会有冲突
+    let ui = crate::unsafe_ref!(Self, self, mut).ui_mut();
+    let data = crate::unsafe_ref!(Self, self, mut).data_mut();
+
+    // 清除已有的数据
+    data.clear();
+
+    // 使用 view port ui 的能力，逐一填充数据
+    ui.fill(|dir| match (f)(dir) {
+      None => false,
+      Some(x) => {
+        match dir {
+          LogDirection::Forward => data.push_back(x),
+          LogDirection::Backward => data.push_front(x),
+        }
+        true
+      }
+    });
+  }
+}
+
+pub trait ViewPortController: ViewPortEx {
+  /// 调整展示区的高度
+  fn set_height(&mut self, height: usize) {
+    self.ui_mut().set_height(height);
   }
 
-  fn set_cursor_at_top(&mut self) -> &mut Self {
-    self.ui().set_cursor_at_top();
-    self
+  /// 总是跟踪到最新的日志（退出导航模式）
+  fn want_follow(&mut self) {
+    *self.control_mut() = Control::Follow;
   }
 
-  fn set_cursor_at_bottom(&mut self) -> &mut Self {
-    self.ui().set_cursor_at_bottom();
-    self
+  /// 按步移动光标
+  fn want_move_cursor(&mut self, steps: isize) {
+    *self.control_mut() = Control::MoveBySteps(steps);
+  }
+
+  /// 往上翻页
+  fn want_page_up(&mut self) {
+    *self.control_mut() = Control::PageUp;
+  }
+
+  /// 往下翻页
+  fn want_page_down(&mut self) {
+    *self.control_mut() = Control::PageDown;
+  }
+
+  /// 获取光标指向的数据索引
+  fn cursor(&self) -> usize {
+    self.ui().cursor()
+  }
+
+  /// 获取所有的数据项
+  fn items(&self) -> &VecDeque<Self::Item> {
+    self.data()
   }
 }
 
@@ -206,4 +339,61 @@ impl ViewPort {
       false
     }
   }
+}
+
+#[macro_export]
+macro_rules! view_port {
+  ($name:ident, $item_type:ty) => {
+    use crate::{
+      app::then::Then,
+      ui::{
+        ViewPort as ViewPortBase, ViewPortController, ViewPortEx,
+        view_port::Control as ViewPortControl,
+      },
+    };
+    use std::collections::VecDeque;
+
+    /// 维护日志展示区的数据
+    #[derive(Default)]
+    struct $name {
+      /// 展示区 UI 相关的数据
+      ui: ViewPortBase,
+
+      /// 日志行，从前往后对应展示区的日志从上往下
+      data: VecDeque<$item_type>,
+
+      /// 当帧需要处理的控制
+      control: ViewPortControl,
+    }
+
+    impl Then for $name {}
+    impl ViewPortController for $name {}
+    impl ViewPortEx for $name {
+      type Item = $item_type;
+
+      fn ui_mut(&mut self) -> &mut ViewPortBase {
+        &mut self.ui
+      }
+
+      fn ui(&self) -> &ViewPortBase {
+        &self.ui
+      }
+
+      fn data_mut(&mut self) -> &mut VecDeque<Self::Item> {
+        &mut self.data
+      }
+
+      fn data(&self) -> &VecDeque<Self::Item> {
+        &self.data
+      }
+
+      fn control_mut(&mut self) -> &mut ViewPortControl {
+        &mut self.control
+      }
+
+      fn control(&self) -> ViewPortControl {
+        self.control
+      }
+    }
+  };
 }

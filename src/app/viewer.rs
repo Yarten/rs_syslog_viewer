@@ -78,7 +78,7 @@ impl Viewer {
 
     // ------------------------------------------
     // 创造各个控制器
-    let log_controller = Rc::new(RefCell::new(LogController::new()));
+    let log_controller = Rc::new(RefCell::new(LogController::default()));
 
     // ------------------------------------------
     // 记录所有控制器
