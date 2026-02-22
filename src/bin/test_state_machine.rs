@@ -1,5 +1,5 @@
 use color_eyre::Result;
-use crossterm::event::{self, KeyCode, KeyEvent};
+use crossterm::event::{self, KeyCode, KeyEvent, KeyModifiers};
 use ratatui::DefaultTerminal;
 use rs_syslog_viewer::ui::{DemoPage, KeyEventEx, Pager, State, StateMachine};
 use std::cell::RefCell;

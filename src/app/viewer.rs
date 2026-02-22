@@ -1,15 +1,24 @@
-use crate::app::StateBuilder;
-use crate::ui::State;
 use crate::{
-  app::{Controller, LogHub, controller::LogController, page::LogPage, state::LogNavigationState},
+  app::{
+    Controller, LogHub, StateBuilder,
+    controller::{LogController, TagController},
+    page::{LogPage, TagPage},
+    state::{LogNavigationState, TagOperationState},
+  },
   log::Config as LogConfig,
-  ui::{Pager, StateMachine, pager::Theme as PagerTheme, state_machine::Config as SmConfig},
+  ui::{
+    KeyEventEx, Pager, State, StateMachine, pager::Theme as PagerTheme,
+    state_machine::Config as SmConfig,
+  },
 };
 use color_eyre::Result;
+use crossterm::event::{KeyCode, KeyEvent};
 use ratatui::DefaultTerminal;
-use std::collections::HashMap;
-use std::path::PathBuf;
-use std::{cell::RefCell, rc::Rc};
+use std::{
+  collections::HashMap,
+  path::PathBuf,
+  {cell::RefCell, rc::Rc},
+};
 
 /// 程序配置
 #[derive(Default)]
@@ -40,6 +49,48 @@ pub struct Viewer {
 
   /// 所有的控制器
   controllers: Vec<Rc<RefCell<dyn Controller>>>,
+}
+
+const TAG_PAGE: usize = 1;
+
+/// 辅助构建状态机的类
+struct StateMachineBuilder {
+  sm_config: SmConfig,
+  log_nav_state: State,
+  tag_nav_state: State,
+}
+
+impl StateMachineBuilder {
+  fn build(self) -> StateMachine {
+    const LOG_NAV_STATE: usize = 1;
+    const TAG_NAV_STATE: usize = 2;
+
+    StateMachine::new(self.sm_config)
+      // 根状态，也即日志导航状态
+      .root_state(
+        LOG_NAV_STATE,
+        self
+          .log_nav_state
+          .enter_action(|pager| pager.focus_root())
+          .goto_action(
+            KeyEvent::simple(KeyCode::Char('t')),
+            TAG_NAV_STATE,
+            |pager| {
+              pager.open_left(TAG_PAGE);
+              true
+            },
+          )
+          .action(KeyEvent::ctrl('t'), |pager| pager.toggle_left(TAG_PAGE)),
+      )
+      // 标签导航状态
+      .state(
+        TAG_NAV_STATE,
+        self
+          .tag_nav_state
+          .enter_action(|pager| pager.focus(TAG_PAGE))
+          .goto(KeyEvent::simple(KeyCode::Esc), LOG_NAV_STATE),
+      )
+  }
 }
 
 impl Viewer {
@@ -79,21 +130,27 @@ impl Viewer {
     // ------------------------------------------
     // 创造各个控制器
     let log_controller = Rc::new(RefCell::new(LogController::default()));
+    let tag_controller = Rc::new(RefCell::new(TagController::default()));
 
     // ------------------------------------------
     // 记录所有控制器
-    let controllers: Vec<Rc<RefCell<dyn Controller>>> = vec![log_controller.clone()];
+    let controllers: Vec<Rc<RefCell<dyn Controller>>> =
+      vec![log_controller.clone(), tag_controller.clone()];
 
     // ------------------------------------------
     // 构建状态机与状态
-    let sm = Self::build_state_machine(
-      config.sm_config,
-      LogNavigationState::new(log_controller.clone()).build(),
-    );
+    let sm = StateMachineBuilder {
+      sm_config: config.sm_config,
+      log_nav_state: LogNavigationState::new(log_controller.clone()).build(),
+      tag_nav_state: TagOperationState::new(tag_controller.clone()).build(),
+    }
+    .build();
 
     // ------------------------------------------
     // 构建页面
-    let pager = Pager::new(config.pager_theme).add_page_as_root(LogPage { log_controller });
+    let pager = Pager::new(config.pager_theme)
+      .add_page_as_root(LogPage { log_controller })
+      .add_page(TAG_PAGE, TagPage { tag_controller });
 
     // ------------------------------------------
     // 构造并返回本类对象
@@ -103,13 +160,6 @@ impl Viewer {
       sm,
       controllers,
     }
-  }
-
-  /// 将各个业务状态结合起来，形成状态机
-  fn build_state_machine(sm_config: SmConfig, log_nav_state: State) -> StateMachine {
-    const LOG_NAV_STATE: usize = 1;
-
-    StateMachine::new(sm_config).root_state(LOG_NAV_STATE, log_nav_state)
   }
 
   /// 核心处理与渲染循环

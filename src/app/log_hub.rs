@@ -321,7 +321,7 @@ impl<'a> LogHubRef<'a> {
 
   /// 尝试加载更旧的日志。将会从给定的日志索引中，找到已经顶到头的那些，
   /// 要求它们进行加载。
-  pub fn try_load_older_logs(&mut self, index: Index) {
+  pub fn try_load_older_logs(&mut self, index: &Index) {
     index
       .indexes
       .iter()

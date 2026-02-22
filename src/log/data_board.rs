@@ -13,6 +13,9 @@ pub struct TagsData {
 
   /// 标签版本信息
   ver: usize,
+
+  /// 标记标签内容是否有变化
+  changed: bool,
 }
 
 impl TagsData {
@@ -46,6 +49,7 @@ impl TagsData {
   pub fn insert_new(&mut self, tag: &str) {
     self.hashed_tags.insert(tag.to_string(), true);
     self.updated_tags.insert(tag.to_string());
+    self.changed = true;
   }
 
   pub fn get_version(&self) -> usize {
@@ -53,7 +57,10 @@ impl TagsData {
   }
 
   pub fn update_version(&mut self) {
-    self.ver += 1;
+    if self.changed {
+      self.ver += 1;
+      self.changed = false;
+    }
   }
 
   pub fn take_updated(&mut self) -> HashSet<String> {
@@ -62,7 +69,10 @@ impl TagsData {
 
   fn set_value(&mut self, tag: &str, value: bool) {
     if let Some(flag) = self.hashed_tags.get_mut(tag) {
-      *flag = value;
+      if *flag != value {
+        self.changed = true;
+        *flag = value;
+      }
     }
   }
 }

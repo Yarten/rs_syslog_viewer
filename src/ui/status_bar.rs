@@ -90,12 +90,12 @@ impl StatusBar {
   {
     self.mode = Mode::Input;
     self.message = message.into() + ": ";
-    self.reset_input();
+    self.reset_input(String::new());
   }
 
-  pub fn reset_input(&mut self) {
-    self.input.clear();
-    self.input_index = 0;
+  pub fn reset_input(&mut self, input: String) {
+    self.input = input;
+    self.input_index = self.input.chars().count();
   }
 }
 

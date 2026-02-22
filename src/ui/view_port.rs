@@ -1,4 +1,10 @@
 use crate::log::LogDirection;
+use ratatui::{
+  buffer::Buffer,
+  layout::Rect,
+  prelude::{Color, Style},
+  widgets::{List, ListItem, ListState, StatefulWidget},
+};
 use std::collections::VecDeque;
 
 /// 描述本帧内的控制
@@ -36,8 +42,12 @@ pub struct ViewPort {
 
   /// 数据数量统计
   data_count: usize,
+
+  /// 当帧需要处理的控制
+  pub control: Control,
 }
 
+/// 扩展 view port 数据的能力，假设了 view port 数据是由 Key 和 Value 组成的元组
 pub trait CursorEx {
   type Key;
   type Value;
@@ -52,6 +62,7 @@ pub trait CursorEx {
   }
 }
 
+/// 扩展了 [ViewPort] 对具体数据的操作能力，以及响应控制的能力。
 pub trait ViewPortEx {
   /// 展示区每一行的数据内容
   type Item;
@@ -137,40 +148,34 @@ pub trait ViewPortEx {
   }
 }
 
-pub trait ViewPortController: ViewPortEx {
-  /// 调整展示区的高度
-  fn set_height(&mut self, height: usize) {
-    self.ui_mut().set_height(height);
-  }
+/// 扩展 [ViewPort] 渲染到终端的能力
+pub trait ViewPortRenderEx: ViewPortEx {
+  fn render(
+    &mut self,
+    area: Rect,
+    buf: &mut Buffer,
+    focus: bool,
+    f: impl Fn(&Self::Item) -> ListItem,
+  ) {
+    // 构建 list state
+    let mut state = ListState::default();
+    state.select(Some(self.ui().cursor()));
 
-  /// 总是跟踪到最新的日志（退出导航模式）
-  fn want_follow(&mut self) {
-    *self.control_mut() = Control::Follow;
-  }
+    // 组装渲染条目
+    let items: Vec<ListItem> = self.data().iter().map(|i| f(i)).collect();
 
-  /// 按步移动光标
-  fn want_move_cursor(&mut self, steps: isize) {
-    *self.control_mut() = Control::MoveBySteps(steps);
-  }
+    // 渲染
+    List::new(items)
+      .highlight_style(if focus {
+        Style::default().bg(Color::Yellow)
+      } else {
+        Style::default().bg(Color::Gray)
+      })
+      .render(area, buf, &mut state);
 
-  /// 往上翻页
-  fn want_page_up(&mut self) {
-    *self.control_mut() = Control::PageUp;
-  }
-
-  /// 往下翻页
-  fn want_page_down(&mut self) {
-    *self.control_mut() = Control::PageDown;
-  }
-
-  /// 获取光标指向的数据索引
-  fn cursor(&self) -> usize {
-    self.ui().cursor()
-  }
-
-  /// 获取所有的数据项
-  fn items(&self) -> &VecDeque<Self::Item> {
-    self.data()
+    // 由于现在访问得到的 controller 数据都是基于之前的事实计算的，
+    // 因此，我们只能在渲染的最后，再给 controller 更新最新的窗口大小
+    self.ui_mut().set_height(area.height as usize);
   }
 }
 
@@ -187,20 +192,48 @@ impl ViewPort {
     self
   }
 
+  /// 总是跟踪到最新的日志（退出导航模式）
+  pub fn want_follow(&mut self) {
+    self.control = Control::Follow;
+  }
+
+  /// 按步移动光标
+  pub fn want_move_cursor(&mut self, steps: isize) {
+    self.control = Control::MoveBySteps(steps);
+  }
+
+  /// 往上翻页
+  pub fn want_page_up(&mut self) {
+    self.control = Control::PageUp;
+  }
+
+  /// 往下翻页
+  pub fn want_page_down(&mut self) {
+    self.control = Control::PageDown;
+  }
+}
+
+impl ViewPort {
   /// 直接设置光标位置，需要钳制它，防止越界
-  pub fn set_cursor(&mut self, cursor: usize) -> &mut Self {
-    self.cursor = cursor.clamp(0, self.height.saturating_sub(1));
+  fn set_cursor(&mut self, cursor: usize) -> &mut Self {
+    self.cursor = cursor.clamp(
+      0,
+      self
+        .height
+        .saturating_sub(1)
+        .min(self.data_count.saturating_sub(1)),
+    );
     self
   }
 
   /// 将光标移动到展示区最顶部，和具体数据无关
-  pub fn set_cursor_at_top(&mut self) -> &mut Self {
+  fn set_cursor_at_top(&mut self) -> &mut Self {
     self.cursor = 0;
     self
   }
 
   /// 将光标移动到展示区最底部，和具体数据无关
-  pub fn set_cursor_at_bottom(&mut self) -> &mut Self {
+  fn set_cursor_at_bottom(&mut self) -> &mut Self {
     self.cursor = self.height.saturating_sub(1);
     self
   }
@@ -209,7 +242,7 @@ impl ViewPort {
   /// 我们总是要求在条件允许的情况下，光标实际展示的位置不要过于接近底部或顶部。
   ///
   /// 光标的位置总是用 forward 方向（也即往下的迭代方向）的迭代器进行插入。
-  pub fn fill<F>(&mut self, mut f: F)
+  fn fill<F>(&mut self, mut f: F)
   where
     F: FnMut(LogDirection) -> bool,
   {
@@ -347,7 +380,7 @@ macro_rules! view_port {
     use crate::{
       app::then::Then,
       ui::{
-        ViewPort as ViewPortBase, ViewPortController, ViewPortEx,
+        ViewPort as ViewPortBase, ViewPortEx, ViewPortRenderEx,
         view_port::Control as ViewPortControl,
       },
     };
@@ -355,19 +388,16 @@ macro_rules! view_port {
 
     /// 维护日志展示区的数据
     #[derive(Default)]
-    struct $name {
+    pub struct $name {
       /// 展示区 UI 相关的数据
       ui: ViewPortBase,
 
       /// 日志行，从前往后对应展示区的日志从上往下
       data: VecDeque<$item_type>,
-
-      /// 当帧需要处理的控制
-      control: ViewPortControl,
     }
 
     impl Then for $name {}
-    impl ViewPortController for $name {}
+    impl ViewPortRenderEx for $name {}
     impl ViewPortEx for $name {
       type Item = $item_type;
 
@@ -388,11 +418,11 @@ macro_rules! view_port {
       }
 
       fn control_mut(&mut self) -> &mut ViewPortControl {
-        &mut self.control
+        &mut self.ui.control
       }
 
       fn control(&self) -> ViewPortControl {
-        self.control
+        self.ui.control
       }
     }
   };

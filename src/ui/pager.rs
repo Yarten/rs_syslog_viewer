@@ -1,24 +1,31 @@
 use crate::ui::{StatusBar, status_bar};
-use ratatui::layout::{Constraint, Layout, Position};
-use ratatui::widgets::Block;
 use ratatui::{
   Frame,
   buffer::Buffer,
-  layout::{Alignment, Rect},
+  layout::{Alignment, Constraint, Layout, Position, Rect},
   style::{Color, Style},
-  widgets::{BorderType, Borders, Paragraph, Widget},
+  widgets::{Block, BorderType, Borders, Paragraph, Widget},
 };
 use std::{
   borrow::Cow,
   collections::{HashMap, VecDeque},
 };
 
+/// 一帧页面渲染里，该页面的状态数据
+pub struct PageState {
+  /// 输入框的内容
+  pub input: Option<String>,
+
+  /// 焦点页面
+  pub focus: bool,
+}
+
 /// 适用于本页面管理器的渲染接口
 pub trait Page {
   /// 渲染一个组件。
   ///
   /// 我们在 ratatui 原来的参数基础上，补充了 `input` 参数，用于代表当前输入框的内容
-  fn render(&self, area: Rect, buf: &mut Buffer, input: Option<String>);
+  fn render(&self, area: Rect, buf: &mut Buffer, state: &PageState);
 
   /// 本页面的标题名称
   fn title(&'_ self) -> Cow<'_, str>;
@@ -28,7 +35,7 @@ pub trait Page {
 struct DefaultPage;
 
 impl Page for DefaultPage {
-  fn render(&self, area: Rect, buf: &mut Buffer, _: Option<String>) {
+  fn render(&self, area: Rect, buf: &mut Buffer, _: &PageState) {
     Paragraph::new("welcome to viewer")
       .alignment(Alignment::Center)
       .render(area, buf);
@@ -54,7 +61,7 @@ impl DemoPage {
 }
 
 impl Page for DemoPage {
-  fn render(&self, area: Rect, buf: &mut Buffer, input: Option<String>) {
+  fn render(&self, area: Rect, buf: &mut Buffer, _: &PageState) {
     Paragraph::new(self.name.clone() + " Good")
       .style(Style::new().bg(Color::DarkGray).fg(Color::White))
       .alignment(Alignment::Center)
@@ -170,6 +177,10 @@ pub struct Pager {
   /// 左边、右边、全屏总是只记录一个页面，也即在左边连续打开两个页面时，后打开的页面将顶掉前一个的记录，
   /// 本栈主要记录了最后一次操作的顺序，当用户想弹出子页面时，将按先入先出的顺序关闭。
   pages_stack: VecDeque<PageMode>,
+
+  /// 目前焦点所在的页面。如果没有焦点，则焦点默认在根页面上。
+  /// 如果目前打开了一个全屏子页面，那么它也会是焦点。
+  focused_page_index: Option<usize>,
 }
 
 impl Default for Pager {
@@ -186,6 +197,7 @@ impl Pager {
       status_bar: StatusBar::new(theme.status_bar),
       theme,
       pages_stack: VecDeque::new(),
+      focused_page_index: None,
     }
   }
 
@@ -201,8 +213,19 @@ impl Pager {
 }
 
 impl Pager {
+  /// 获取状态栏
   pub fn status(&mut self) -> &mut StatusBar {
     &mut self.status_bar
+  }
+
+  /// 设置焦点子页面。全屏页面无需设置，自动成为焦点
+  pub fn focus(&mut self, index: usize) {
+    self.focused_page_index = Some(index);
+  }
+
+  /// 设置焦点在根页面上
+  pub fn focus_root(&mut self) {
+    self.focused_page_index = None;
   }
 
   /// 在左半边打开指定的子页面。
@@ -341,9 +364,16 @@ impl Pager {
   /// 3. 有一个打开半边的子页面，那么将页面分成两部分，取决于子页面的位置，将小的部分留给它渲染，大的留给根页面；
   /// 4. 如果没有打开的子页面，则全部空间用于渲染根页面。
   fn render_main(&self, area: Rect, buf: &mut Buffer) {
+    // 构建页面状态数据
+    let mut state = PageState {
+      input: self.status_bar.get_input(),
+      focus: false,
+    };
+
     // 置顶打开了一个全屏子页面，全部空间用于渲染它
     if let Some(PageMode::Full(index)) = self.pages_stack.front() {
-      self.render_full_page(area, buf, &self.pages[index]);
+      state.focus = true;
+      self.render_full_page(area, buf, &self.pages[index], &state);
       return;
     }
 
@@ -378,60 +408,94 @@ impl Pager {
           self.theme.half_page_constraint,
         ]);
         let [left, main, right] = area.layout(&horizontal);
-        self.render_half_page(left, buf, &self.pages[left_index]);
-        self.render_full_page(main, buf, &self.root_page);
-        self.render_half_page(right, buf, &self.pages[right_index]);
+
+        state.focus = self.focused_page_index == Some(*left_index);
+        self.render_half_page(left, buf, &self.pages[left_index], &state);
+
+        state.focus = self.focused_page_index == None;
+        self.render_full_page(main, buf, &self.root_page, &state);
+
+        state.focus = self.focused_page_index == Some(*right_index);
+        self.render_half_page(right, buf, &self.pages[right_index], &state);
       }
 
       // 左边渲染子页面，右边渲染根页面
       (Some(left_index), None) => {
         let horizontal = Layout::horizontal([self.theme.half_page_constraint, Constraint::Fill(1)]);
         let [left, main] = area.layout(&horizontal);
-        self.render_half_page(left, buf, &self.pages[left_index]);
-        self.render_full_page(main, buf, &self.root_page);
+
+        state.focus = self.focused_page_index == Some(*left_index);
+        self.render_half_page(left, buf, &self.pages[left_index], &state);
+
+        state.focus = self.focused_page_index == None;
+        self.render_full_page(main, buf, &self.root_page, &state);
       }
 
       // 右边渲染子页面，左边渲染根页面
       (None, Some(right_index)) => {
         let horizontal = Layout::horizontal([Constraint::Fill(1), self.theme.half_page_constraint]);
         let [main, right] = area.layout(&horizontal);
-        self.render_full_page(main, buf, &self.root_page);
-        self.render_half_page(right, buf, &self.pages[right_index]);
+
+        state.focus = self.focused_page_index == None;
+        self.render_full_page(main, buf, &self.root_page, &state);
+
+        state.focus = self.focused_page_index == Some(*right_index);
+        self.render_half_page(right, buf, &self.pages[right_index], &state);
       }
 
       // 没有任何子页面打开，则直接渲染根页面
       (None, None) => {
-        self.render_full_page(area, buf, &self.root_page);
+        state.focus = true;
+        self.render_full_page(area, buf, &self.root_page, &state);
       }
     }
   }
 
   /// 渲染全屏风格的页面
-  fn render_full_page(&self, area: Rect, buf: &mut Buffer, page: &Box<dyn Page>) {
+  fn render_full_page(
+    &self,
+    area: Rect,
+    buf: &mut Buffer,
+    page: &Box<dyn Page>,
+    state: &PageState,
+  ) {
     let block = Block::new()
       .borders(self.theme.full_page.borders)
       .border_type(self.theme.full_page.border_type)
       .border_style(self.theme.full_page.border_style)
       .title_alignment(self.theme.full_page.title_alignment)
       .title_style(self.theme.full_page.title_style);
-    self.render_page(area, buf, page, block);
+    self.render_page(area, buf, page, block, state);
   }
 
   /// 渲染半屏风格的页面
-  fn render_half_page(&self, area: Rect, buf: &mut Buffer, page: &Box<dyn Page>) {
+  fn render_half_page(
+    &self,
+    area: Rect,
+    buf: &mut Buffer,
+    page: &Box<dyn Page>,
+    state: &PageState,
+  ) {
     let block = Block::new()
       .borders(self.theme.half_page.borders)
       .border_type(self.theme.half_page.border_type)
       .border_style(self.theme.half_page.border_style)
       .title_alignment(self.theme.half_page.title_alignment)
       .title_style(self.theme.half_page.title_style);
-    self.render_page(area, buf, page, block);
+    self.render_page(area, buf, page, block, state);
   }
 
-  fn render_page(&self, area: Rect, buf: &mut Buffer, page: &Box<dyn Page>, block: Block) {
+  fn render_page(
+    &self,
+    area: Rect,
+    buf: &mut Buffer,
+    page: &Box<dyn Page>,
+    block: Block,
+    state: &PageState,
+  ) {
     let block = block.title(page.title());
     let inner_area = block.inner(area);
     block.render(area, buf);
-    page.render(inner_area, buf, self.status_bar.get_input());
+    page.render(inner_area, buf, state);
   }
 }

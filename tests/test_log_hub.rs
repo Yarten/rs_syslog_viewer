@@ -31,7 +31,7 @@ async fn test_log_hub() {
     tokio::time::sleep(tokio::time::Duration::from_millis(400)).await;
     let mut data = log_hub.data().await;
     let first_index = data.first_index();
-    data.try_load_older_logs(first_index);
+    data.try_load_older_logs(&first_index);
   }
 
   let mut data = log_hub.data().await;

@@ -107,7 +107,6 @@ async fn test_rotated_log() {
       // 更新数据黑板中的标记记录
       let mut data_board = data_board.lock().await;
       let mut tags = data_board.get_tags_mut();
-      tags.update_version();
 
       let all_tags: HashSet<String> = tags.all().keys().cloned().collect();
       for tag in all_tags {
@@ -117,6 +116,8 @@ async fn test_rotated_log() {
           tags.unset(&tag);
         }
       }
+
+      tags.update_version();
 
       // 构建真值
       let true_filtered_content: Vec<LogLine> = true_content

@@ -1,3 +1,4 @@
+use crate::app::LogItem;
 use crate::log::LogDirection;
 use crate::{
   app::{Controller, Index, LogHubRef},
@@ -54,17 +55,17 @@ impl Default for LogController {
     };
 
     // 默认跟踪最新日志
-    res.view_port.want_follow();
+    res.view_port.ui.want_follow();
     res
   }
 }
 
 impl LogController {
   /// 获得 view port 控制器
-  pub fn view_mut(&mut self) -> &mut impl ViewPortController {
+  pub fn view_mut(&mut self) -> &mut ViewPort {
     &mut self.view_port
   }
-  pub fn view(&self) -> &impl ViewPortController<Item = Item> {
+  pub fn view(&self) -> &ViewPort {
     &self.view_port
   }
 
@@ -77,6 +78,20 @@ impl LogController {
     } else {
       "logs"
     }
+  }
+
+  /// 定位光标指向的数据索引。因为可能标签过滤规则的变化，会导致原来光标指向的数据不可见了
+  fn relocate_cursor_index(data: &mut LogHubRef, index: Index) -> Index {
+    let (mut iter_down, mut iter_up) = data.iter_at(index.clone());
+    match iter_down.next() {
+      None => {}
+      Some((index, _)) => return index,
+    }
+    match iter_up.next() {
+      None => {}
+      Some((index, _)) => return index,
+    }
+    index
   }
 }
 
@@ -91,10 +106,24 @@ impl Controller for LogController {
     // 取出当前光标应指向的数据索引，同时，对光标的位置完成配置
     let cursor_index: Index = self.view_port.apply().key_or(|| data.last_index());
 
+    // 重定位索引，确保它光标总是指向可见的数据
+    let cursor_index = Self::relocate_cursor_index(data, cursor_index);
+
     // 基于当前的光标位置，及其指向的数据索引，填充整个展示区
-    self.view_port.fill(data, cursor_index.clone());
+    self.view_port.fill(data, cursor_index);
 
     // 如果存在数据顶到头，触发更老的日志加载
-    data.try_load_older_logs(cursor_index);
+    data.try_load_older_logs(
+      self
+        .view()
+        .data
+        .front()
+        .map(|(first_index, _)| first_index)
+        .unwrap_or(&data.first_index()),
+    );
+  }
+
+  fn view_port(&mut self) -> Option<&mut ViewPortBase> {
+    Some(&mut self.view_port.ui)
   }
 }

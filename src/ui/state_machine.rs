@@ -35,10 +35,10 @@ pub struct State {
   transitions: Vec<Transition>,
 
   /// 进入该状态时，执行的动作
-  enter_action: Action,
+  enter_action: Vec<Action>,
 
   /// 离开该状态时，执行的动作
-  leave_action: Action,
+  leave_action: Vec<Action>,
 }
 
 impl State {
@@ -50,8 +50,8 @@ impl State {
       name: name.into(),
       input_mode: None,
       transitions: Vec::new(),
-      enter_action: Box::new(|_| {}),
-      leave_action: Box::new(|_| {}),
+      enter_action: Vec::new(),
+      leave_action: Vec::new(),
     }
   }
 
@@ -99,7 +99,7 @@ impl State {
   where
     F: FnMut(&mut Pager) + 'static,
   {
-    self.enter_action = Box::new(act);
+    self.enter_action.push(Box::new(act));
     self
   }
 
@@ -108,7 +108,7 @@ impl State {
   where
     F: FnMut(&mut Pager) + 'static,
   {
-    self.leave_action = Box::new(act);
+    self.leave_action.push(Box::new(act));
     self
   }
 }
@@ -125,12 +125,16 @@ impl State {
       pager.status().set_input(prompt.clone());
     }
 
-    (self.enter_action)(pager);
+    for act in self.enter_action.iter_mut() {
+      act(pager);
+    }
   }
 
   /// 离开状态时，执行的处理
   fn leave(&mut self, pager: &mut Pager) {
-    (self.leave_action)(pager);
+    for act in self.leave_action.iter_mut() {
+      act(pager);
+    }
   }
 
   /// 响应处理键入的事件，返回是否进行状态跳转

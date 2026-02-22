@@ -1,15 +1,13 @@
 use crate::{
   app::controller::LogController,
   log::LogLine,
-  ui::{Page, ViewPortController},
+  ui::{Page, PageState, ViewPortRenderEx},
 };
-use ratatui::style::{Color, Style};
-use ratatui::widgets::{List, ListState};
 use ratatui::{
   buffer::Buffer,
   layout::Rect,
   text::{self, Span},
-  widgets::{ListItem, StatefulWidget},
+  widgets::ListItem,
 };
 use std::{borrow::Cow, cell::RefCell, rc::Rc};
 
@@ -19,29 +17,12 @@ pub struct LogPage {
 }
 
 impl Page for LogPage {
-  fn render(&self, area: Rect, buf: &mut Buffer, input: Option<String>) {
-    let mut ctrl = self.log_controller.borrow_mut();
-
-    // 构建 list state
-    let mut state = ListState::default();
-    state.select(Some(ctrl.view().cursor()));
-
-    // 组装日志
-    let logs: Vec<ListItem> = ctrl
-      .view()
-      .items()
-      .iter()
-      .map(|(_, i)| self.render_log_line(i))
-      .collect();
-
-    // 渲染
-    List::new(logs)
-      .highlight_style(Style::default().bg(Color::Yellow))
-      .render(area, buf, &mut state);
-
-    // 由于现在访问得到的 controller 数据都是基于之前的事实计算的，
-    // 因此，我们只能在渲染的最后，再给 controller 更新最新的窗口大小
-    ctrl.view_mut().set_height(area.height as usize);
+  fn render(&self, area: Rect, buf: &mut Buffer, state: &PageState) {
+    self
+      .log_controller
+      .borrow_mut()
+      .view_mut()
+      .render(area, buf, state.focus, |(_, i)| self.render_log_line(i));
   }
 
   fn title(&'_ self) -> Cow<'_, str> {
