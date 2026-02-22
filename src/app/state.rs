@@ -5,8 +5,11 @@ use crate::{
 use crossterm::event::{KeyCode, KeyEvent};
 use std::{cell::RefCell, rc::Rc};
 
+mod debug_operation_state;
 mod log_navigation_state;
 mod tag_operation_state;
+
+pub use debug_operation_state::DebugOperationState;
 pub use log_navigation_state::LogNavigationState;
 pub use tag_operation_state::TagOperationState;
 

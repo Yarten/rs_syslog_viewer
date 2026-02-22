@@ -150,7 +150,7 @@ impl TailReader {
       // 一直读取，直至到达文件头部
       while !state.has_reached_head() && !cancel_token.is_cancelled() {
         if let Err(e) = reader::read_head_lines(&mut buffer, &mut state).await {
-          eprintln!("Error while reading head lines: {e}");
+          crate::eprintln!("Error while reading head lines: {e}");
           break;
         }
       }
@@ -177,7 +177,7 @@ impl TailReader {
       let mut watcher = match state.watcher(config.poll_interval) {
         Ok(w) => w,
         Err(e) => {
-          eprintln!("Failed to watch watcher: {e}");
+          crate::eprintln!("Failed to watch watcher: {e}");
           return;
         }
       };
@@ -203,14 +203,14 @@ impl TailReader {
             // 文件变更，对于我们从尾部读取的情况来说，就是尾部新增了内容
             Ok(ChangedEvent::Content) => {
               if let Err(e) = reader::read_tail_lines(&mut buffer, &mut state).await {
-                eprintln!("Error while reading tail lines: {e}");
+                crate::eprintln!("Error while reading tail lines: {e}");
                 break 'watch_loop;
               }
             },
 
             // 出现错误则报错退出
             Err(e) => {
-              eprintln!("Failed to watch watcher: {e}");
+              crate::eprintln!("Failed to watch watcher: {e}");
               break 'watch_loop;
             }
           }

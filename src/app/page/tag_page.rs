@@ -2,10 +2,10 @@ use crate::{
   app::controller::TagController,
   ui::{Page, PageState, ViewPortRenderEx},
 };
-use ratatui::style::{Color, Style, Styled};
 use ratatui::{
   buffer::Buffer,
   layout::Rect,
+  style::{Color, Style, Styled},
   text::{self, Span},
   widgets::ListItem,
 };

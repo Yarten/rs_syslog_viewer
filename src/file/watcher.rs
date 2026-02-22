@@ -38,7 +38,7 @@ impl MetadataEvent {
       MetadataEvent::Any => false,
       MetadataEvent::Renamed(new_path) => {
         if let Err(e) = tx.send(Event::Renamed(new_path)).await {
-          eprintln!("Failed to send renamed event: {e}");
+          crate::eprintln!("Failed to send renamed event: {e}");
           true
         } else {
           false
@@ -46,7 +46,7 @@ impl MetadataEvent {
       }
       MetadataEvent::Removed => {
         if let Err(e) = tx.send(Event::Removed).await {
-          eprintln!("Failed to send removed event: {e}");
+          crate::eprintln!("Failed to send removed event: {e}");
         }
         true
       }
@@ -152,7 +152,7 @@ impl Watcher {
               event = event_ref.clone();
             },
             Err(e) => {
-              eprintln!("Error when reading notify event {} of file {}", e, self.raw_path.to_str().unwrap_or(""));
+              crate::eprintln!("Error when reading notify event {} of file {}", e, self.raw_path.to_str().unwrap_or(""));
               return Err(anyhow!(e.to_string()));
             }
         }
@@ -214,7 +214,7 @@ impl Watcher {
               },
               Err(e) => {
                 // 如果报错，我们也认为该文件被删除，发送删除事件并结束轮询
-                eprintln!("{} read link failed: {}", fd_path.to_str().unwrap_or(""), e);
+                crate::eprintln!("{} read link failed: {}", fd_path.to_str().unwrap_or(""), e);
                 let _ = tx.send(MetadataEvent::Removed);
                 break;
               }

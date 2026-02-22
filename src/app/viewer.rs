@@ -1,10 +1,11 @@
 use crate::{
   app::{
     Controller, LogHub, StateBuilder,
-    controller::{LogController, TagController},
-    page::{LogPage, TagPage},
-    state::{LogNavigationState, TagOperationState},
+    controller::{DebugController, LogController, TagController},
+    page::{DebugPage, LogPage, TagPage},
+    state::{DebugOperationState, LogNavigationState, TagOperationState},
   },
+  debug,
   log::Config as LogConfig,
   ui::{
     KeyEventEx, Pager, State, StateMachine, pager::Theme as PagerTheme,
@@ -21,7 +22,6 @@ use std::{
 };
 
 /// 程序配置
-#[derive(Default)]
 pub struct Config {
   /// 日志目录
   pub logs_root: PathBuf,
@@ -34,6 +34,21 @@ pub struct Config {
 
   /// 状态机的配置
   pub sm_config: SmConfig,
+
+  /// 调试用的日志记录缓存大小
+  pub debug_buffer_size: usize,
+}
+
+impl Default for Config {
+  fn default() -> Self {
+    Self {
+      logs_root: Default::default(),
+      logs_configs: Default::default(),
+      pager_theme: Default::default(),
+      sm_config: Default::default(),
+      debug_buffer_size: 200,
+    }
+  }
 }
 
 /// 日志可视化主体，也是该应用进程的启动入口
@@ -52,18 +67,21 @@ pub struct Viewer {
 }
 
 const TAG_PAGE: usize = 1;
+const DEBUG_PAGE: usize = 2;
 
 /// 辅助构建状态机的类
 struct StateMachineBuilder {
   sm_config: SmConfig,
   log_nav_state: State,
   tag_nav_state: State,
+  debug_nav_state: State,
 }
 
 impl StateMachineBuilder {
   fn build(self) -> StateMachine {
     const LOG_NAV_STATE: usize = 1;
     const TAG_NAV_STATE: usize = 2;
+    const DEBUG_NAV_STATE: usize = 3;
 
     StateMachine::new(self.sm_config)
       // 根状态，也即日志导航状态
@@ -71,7 +89,11 @@ impl StateMachineBuilder {
         LOG_NAV_STATE,
         self
           .log_nav_state
-          .enter_action(|pager| pager.focus_root())
+          .enter_action(|pager| {
+            pager.focus_root();
+            pager.status().set_info("press 'h' for help");
+          })
+          // 按 t 或 ctrl+t 聚焦与开关标签过滤页面
           .goto_action(
             KeyEvent::simple(KeyCode::Char('t')),
             TAG_NAV_STATE,
@@ -80,7 +102,17 @@ impl StateMachineBuilder {
               true
             },
           )
-          .action(KeyEvent::ctrl('t'), |pager| pager.toggle_left(TAG_PAGE)),
+          .action(KeyEvent::ctrl('t'), |pager| pager.toggle_left(TAG_PAGE))
+          // 按 d 或 ctrl+d 聚焦与开关标签过滤页面
+          .goto_action(
+            KeyEvent::simple(KeyCode::Char('d')),
+            DEBUG_NAV_STATE,
+            |pager| {
+              pager.open_right(DEBUG_PAGE);
+              true
+            },
+          )
+          .action(KeyEvent::ctrl('d'), |pager| pager.toggle_right(DEBUG_PAGE)),
       )
       // 标签导航状态
       .state(
@@ -90,6 +122,18 @@ impl StateMachineBuilder {
           .enter_action(|pager| pager.focus(TAG_PAGE))
           .goto(KeyEvent::simple(KeyCode::Esc), LOG_NAV_STATE),
       )
+      // 调试界面状态
+      .state(
+        DEBUG_NAV_STATE,
+        self
+          .debug_nav_state
+          .enter_action(|pager| {
+            pager.focus(DEBUG_PAGE);
+            pager.status().set_info("press 'd' or esc to unfocus");
+          })
+          .goto(KeyEvent::simple(KeyCode::Esc), LOG_NAV_STATE)
+          .goto(KeyEvent::simple(KeyCode::Char('d')), LOG_NAV_STATE),
+      )
   }
 }
 
@@ -97,6 +141,7 @@ impl Viewer {
   /// 启动 UI 渲染流程，包装核心循环，并做好资源回收
   pub fn run(config: Config) -> Result<()> {
     color_eyre::install()?;
+    debug::enable_debug(config.debug_buffer_size);
     ratatui::run(|terminal| {
       // 创建 runtime
       let rt = tokio::runtime::Builder::new_multi_thread()
@@ -131,11 +176,15 @@ impl Viewer {
     // 创造各个控制器
     let log_controller = Rc::new(RefCell::new(LogController::default()));
     let tag_controller = Rc::new(RefCell::new(TagController::default()));
+    let debug_controller = Rc::new(RefCell::new(DebugController::default()));
 
     // ------------------------------------------
     // 记录所有控制器
-    let controllers: Vec<Rc<RefCell<dyn Controller>>> =
-      vec![log_controller.clone(), tag_controller.clone()];
+    let controllers: Vec<Rc<RefCell<dyn Controller>>> = vec![
+      log_controller.clone(),
+      tag_controller.clone(),
+      debug_controller.clone(),
+    ];
 
     // ------------------------------------------
     // 构建状态机与状态
@@ -143,6 +192,7 @@ impl Viewer {
       sm_config: config.sm_config,
       log_nav_state: LogNavigationState::new(log_controller.clone()).build(),
       tag_nav_state: TagOperationState::new(tag_controller.clone()).build(),
+      debug_nav_state: DebugOperationState::new(debug_controller.clone()).build(),
     }
     .build();
 
@@ -150,7 +200,8 @@ impl Viewer {
     // 构建页面
     let pager = Pager::new(config.pager_theme)
       .add_page_as_root(LogPage { log_controller })
-      .add_page(TAG_PAGE, TagPage { tag_controller });
+      .add_page(TAG_PAGE, TagPage { tag_controller })
+      .add_page(DEBUG_PAGE, DebugPage { debug_controller });
 
     // ------------------------------------------
     // 构造并返回本类对象

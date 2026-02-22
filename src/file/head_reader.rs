@@ -109,7 +109,7 @@ impl HeadReader {
           // 监控文件的路径变化
           res = watcher.changed() => match res {
             Err(e) => {
-              eprintln!("watcher error: {:?}", e);
+              crate::eprintln!("watcher error: {:?}", e);
               break 'watch_loop;
             },
             Ok(ChangedEvent::Metadata(event)) => {
@@ -146,7 +146,7 @@ impl HeadReader {
         let last_position = state.position();
 
         if let Err(e) = reader::read_tail_lines(&mut buffer, &mut state).await {
-          eprintln!("Error while reading tail lines: {e}");
+          crate::eprintln!("Error while reading tail lines: {e}");
           break;
         }
 

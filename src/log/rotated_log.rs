@@ -233,7 +233,7 @@ impl RotatedLog {
 
   /// 打开指定路径的日志文件
   async fn open_log_file(&self, path: PathBuf) -> Option<LogFile> {
-    println!("load log file {:?}", path);
+    crate::println!("load log file {:?}", path);
 
     // 如果要求被加载的日志文件名称等于系统日志最新的那份文件名称，
     // 则我们认为我们在打开一份正在被实时更新的日志文件
@@ -243,7 +243,7 @@ impl RotatedLog {
     match LogFile::open(path, is_rolling_log).await {
       Ok(log_file) => Some(log_file),
       Err(e) => {
-        eprintln!("failed to load log file: {}", e);
+        crate::eprintln!("failed to load log file: {}", e);
         None
       }
     }

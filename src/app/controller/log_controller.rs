@@ -1,12 +1,9 @@
-use crate::app::LogItem;
-use crate::log::LogDirection;
 use crate::{
   app::{Controller, Index, LogHubRef},
-  log::LogLine,
+  log::{LogDirection, LogLine},
   ui::CursorEx,
 };
-use std::path::PathBuf;
-use std::sync::Arc;
+use std::{path::PathBuf, sync::Arc};
 
 /// 展示区里维护的数据条目
 type Item = (Index, LogLine);

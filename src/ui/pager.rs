@@ -313,7 +313,7 @@ impl Pager {
     if self.pages.contains_key(&index) {
       true
     } else {
-      eprintln!("failed to open the unexisted page ! ({index})");
+      crate::eprintln!("failed to open the unexisted page ! ({index})");
       false
     }
   }

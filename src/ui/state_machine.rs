@@ -272,14 +272,14 @@ impl StateMachine {
         Ok(_) => {}
 
         // 读取事件出错，记录，程序继续运行
-        Err(e) => eprintln!("event::read() error: {}", e),
+        Err(e) => crate::eprintln!("event::read() error: {}", e),
       },
 
       // 没有事件发生，程序继续运行
       Ok(false) => {}
 
       // 报错，记录错误，程序继续运行
-      Err(e) => eprintln!("event::poll() error: {}", e),
+      Err(e) => crate::eprintln!("event::poll() error: {}", e),
     }
 
     // 程序继续运行
