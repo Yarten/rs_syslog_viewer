@@ -1,5 +1,5 @@
 use crate::{
-  app::controller::LogController,
+  app::{controller::LogController, rich},
   log::LogLine,
   ui::{Page, PageState, ViewPortRenderEx},
 };
@@ -40,7 +40,7 @@ impl LogPage {
       LogLine::Good(log) => {
         line.push_span(Span::raw(log.timestamp.to_rfc3339()));
         line.push_span(Span::raw(&log.tag));
-        line.push_span(Span::raw(&log.message));
+        rich(&mut line, &log.message, "");
       }
 
       // 坏的日志

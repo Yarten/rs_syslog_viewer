@@ -32,19 +32,22 @@ impl TagOperationState {
 
 impl StateBuilder for TagOperationState {
   fn build(self) -> State {
-    let ctrl = self.tag_controller.clone();
+    let c1 = self.tag_controller.clone();
+    let c2 = c1.clone();
+    let c3 = c1.clone();
+
     self
       .action(KeyEvent::simple(KeyCode::Enter), |ctrl| ctrl.toggle())
       .action(KeyEvent::ctrl('y'), |ctrl| ctrl.set_all())
       .action(KeyEvent::ctrl('n'), |ctrl| ctrl.unset_all())
       .action(KeyEvent::ctrl('h'), |ctrl| ctrl.toggle_all())
       .state
-      .view_port(ctrl.clone())
-      .input("Tags")
+      .view_port(c1)
+      .input("Tags", move |s| c2.borrow_mut().search(s.to_string()))
       .enter_action(move |pager| {
         pager
           .status()
-          .reset_input(ctrl.borrow().get_curr_search().to_string());
+          .reset_input(c3.borrow().get_curr_search().to_string());
       })
   }
 }

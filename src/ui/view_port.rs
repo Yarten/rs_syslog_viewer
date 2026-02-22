@@ -167,7 +167,7 @@ pub trait ViewPortRenderEx: ViewPortEx {
     // 渲染
     List::new(items)
       .highlight_style(if focus {
-        Style::default().bg(Color::Yellow)
+        Style::default().bg(Color::Blue)
       } else {
         Style::default().bg(Color::Gray)
       })

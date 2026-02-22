@@ -1,5 +1,5 @@
 use crate::{
-  app::controller::TagController,
+  app::{controller::TagController, rich},
   ui::{Page, PageState, ViewPortRenderEx},
 };
 use ratatui::{
@@ -18,11 +18,14 @@ pub struct TagPage {
 
 impl Page for TagPage {
   fn render(&self, area: Rect, buf: &mut Buffer, state: &PageState) {
-    self
-      .tag_controller
-      .borrow_mut()
+    let mut tag_controller = self.tag_controller.borrow_mut();
+    let search = crate::unsafe_ref!(str, tag_controller.get_curr_search());
+
+    tag_controller
       .view_mut()
-      .render(area, buf, state.focus, |(k, v)| self.render_tag(k, *v));
+      .render(area, buf, state.focus, |(k, v)| {
+        self.render_tag(k, *v, search)
+      });
   }
 
   fn title(&'_ self) -> Cow<'_, str> {
@@ -31,8 +34,8 @@ impl Page for TagPage {
 }
 
 impl TagPage {
-  fn render_tag<'a>(&self, tag: &'a str, state: bool) -> ListItem<'a> {
-    let mut line = text::Text::default();
+  fn render_tag<'a>(&self, tag: &'a str, state: bool, search: &str) -> ListItem<'a> {
+    let mut line = text::Line::default();
 
     // 标识是否选中该标签的复选框
     let checkbox_style = Style::default().bg(Color::DarkGray).white().bold();
@@ -45,7 +48,7 @@ impl TagPage {
     line.push_span("]".set_style(checkbox_style));
 
     // 标签内容本身
-    line.push_span(Span::raw(tag));
+    rich(&mut line, tag, search);
 
     ListItem::new(line)
   }

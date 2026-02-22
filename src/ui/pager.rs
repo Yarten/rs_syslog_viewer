@@ -13,9 +13,6 @@ use std::{
 
 /// 一帧页面渲染里，该页面的状态数据
 pub struct PageState {
-  /// 输入框的内容
-  pub input: Option<String>,
-
   /// 焦点页面
   pub focus: bool,
 }
@@ -365,10 +362,7 @@ impl Pager {
   /// 4. 如果没有打开的子页面，则全部空间用于渲染根页面。
   fn render_main(&self, area: Rect, buf: &mut Buffer) {
     // 构建页面状态数据
-    let mut state = PageState {
-      input: self.status_bar.get_input(),
-      focus: false,
-    };
+    let mut state = PageState { focus: false };
 
     // 置顶打开了一个全屏子页面，全部空间用于渲染它
     if let Some(PageMode::Full(index)) = self.pages_stack.front() {

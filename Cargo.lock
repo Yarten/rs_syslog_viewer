@@ -1383,6 +1383,7 @@ dependencies = [
  "lazy_static",
  "notify",
  "ratatui",
+ "regex",
  "tokio",
  "tokio-util",
 ]

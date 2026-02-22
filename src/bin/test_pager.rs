@@ -12,12 +12,14 @@ fn run(terminal: &mut DefaultTerminal, mut pager: Pager) -> Result<()> {
       if input_mode {
         match key.code {
           KeyCode::Enter => {
-            let input = pager.status().get_input().unwrap();
+            let input = pager.status().get_input().unwrap().clone();
             pager.status().set_info(input);
             input_mode = false;
           }
           KeyCode::Char(to_insert) => pager.status().enter_char(to_insert),
-          KeyCode::Backspace => pager.status().delete_char(),
+          KeyCode::Backspace => {
+            pager.status().delete_char();
+          }
           KeyCode::Left => pager.status().move_cursor_left(),
           KeyCode::Right => pager.status().move_cursor_right(),
           KeyCode::Esc => {

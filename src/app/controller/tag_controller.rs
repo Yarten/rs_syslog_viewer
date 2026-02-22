@@ -92,11 +92,8 @@ impl TagController {
     self.control = Control::ToggleAll;
   }
 
-  pub fn search(&mut self, input: Option<String>) {
-    match input {
-      None => self.curr_search.clear(),
-      Some(input) => self.curr_search = input,
-    }
+  pub fn search(&mut self, input: String) {
+    self.curr_search = input;
   }
 
   pub fn get_curr_search(&self) -> &str {

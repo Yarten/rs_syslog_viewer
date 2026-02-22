@@ -9,6 +9,9 @@ type Action = Box<dyn FnMut(&mut Pager)>;
 /// 返回值决定了是否要跳转到下一个状态（这个状态在定义状态机时已经完成定义）
 type GotoAction = Box<dyn FnMut(&mut Pager) -> bool>;
 
+/// 输入栏内容变更时的回调函数
+type InputHandler = Box<dyn FnMut(&str)>;
+
 /// 定义状态响应某个键盘事件后，发生的动作、或下一个转移的目标状态
 struct Transition {
   /// 响应的事件
@@ -21,6 +24,15 @@ struct Transition {
   next_state: usize,
 }
 
+/// 输入模式下的数据
+struct InputMode {
+  /// 状态栏提示的内容
+  prompt: String,
+
+  /// 内容发生变更时调用的回调函数
+  handler: InputHandler,
+}
+
 /// 状态机中的一个状态
 pub struct State {
   /// 状态的名称，仅用于调试。在状态机中索引状态，使用的是整数
@@ -28,8 +40,7 @@ pub struct State {
 
   /// 标识本状态是否处理 status bar 的输入，和输入相关的操作，
   /// 包括一般字符、大写字符、左右方向键、退格键都会被优先处理，
-  /// 其中的字符串定义的是输入时展示的 prompt
-  input_mode: Option<String>,
+  input_mode: Option<InputMode>,
 
   /// 有序的转移条件及其动作定义
   transitions: Vec<Transition>,
@@ -57,11 +68,15 @@ impl State {
 
   /// 将本状态配置为一个内容输入状态，将会优先处理和输入相关的事件，
   /// 并设置输入内容到 status bar 中。
-  pub fn input<T>(mut self, prompt: T) -> Self
+  pub fn input<T, F>(mut self, prompt: T, handler: F) -> Self
   where
     T: Into<String>,
+    F: FnMut(&str) + 'static,
   {
-    self.input_mode = Some(prompt.into());
+    self.input_mode = Some(InputMode {
+      prompt: prompt.into(),
+      handler: Box::new(handler),
+    });
     self
   }
 
@@ -121,8 +136,8 @@ impl State {
 
   /// 进入状态时，执行的处理
   fn enter(&mut self, pager: &mut Pager) {
-    if let Some(prompt) = &self.input_mode {
-      pager.status().set_input(prompt.clone());
+    if let Some(state) = &self.input_mode {
+      pager.status().set_input(state.prompt.clone());
     }
 
     for act in self.enter_action.iter_mut() {
@@ -145,7 +160,7 @@ impl State {
     }
 
     // 优先处理输入的相关的事件
-    if self.input_mode.is_some() && self.handle_input(pager, event) {
+    if self.handle_input(pager, event).is_some() {
       return None;
     }
 
@@ -165,24 +180,39 @@ impl State {
   }
 
   /// 处理输入事件。如果事件被消耗，返回 true
-  fn handle_input(&mut self, pager: &mut Pager, event: KeyEvent) -> bool {
+  fn handle_input(&mut self, pager: &mut Pager, event: KeyEvent) -> Option<()> {
     if !event.is_press() {
-      return false;
+      return None;
     }
 
-    match event.code {
+    // 取出输入模式下的回调处理函数。如果没有配置输入模式，则终止处理
+    let handler = &mut self.input_mode.as_mut()?.handler;
+
+    // 响应输入相关的按键输入，记录内容是否变更
+    let changed = match event.code {
       KeyCode::Char(to_insert) if !event.modifiers.contains(KeyModifiers::CONTROL) => {
-        pager.status().enter_char(to_insert)
+        pager.status().enter_char(to_insert);
+        true
       }
       KeyCode::Backspace => pager.status().delete_char(),
-      KeyCode::Left => pager.status().move_cursor_left(),
-      KeyCode::Right => pager.status().move_cursor_right(),
-      _ => {
-        return false;
+      KeyCode::Left => {
+        pager.status().move_cursor_left();
+        false
       }
+      KeyCode::Right => {
+        pager.status().move_cursor_right();
+        false
+      }
+      _ => {
+        return None;
+      }
+    };
+
+    if changed && let Some(input) = pager.status().get_input() {
+      (handler)(input);
     }
 
-    true
+    Some(())
   }
 }
 

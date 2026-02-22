@@ -100,9 +100,9 @@ impl StatusBar {
 }
 
 impl StatusBar {
-  pub fn get_input(&self) -> Option<String> {
+  pub fn get_input(&self) -> Option<&String> {
     if let Mode::Input = self.mode {
-      Some(self.input.clone())
+      Some(&self.input)
     } else {
       None
     }
@@ -114,7 +114,7 @@ impl StatusBar {
     self.move_cursor_right();
   }
 
-  pub fn delete_char(&mut self) {
+  pub fn delete_char(&mut self) -> bool {
     let is_not_cursor_leftmost = self.input_index != 0;
     if is_not_cursor_leftmost {
       // Method "remove" is not used on the saved text for deleting the selected char.
@@ -134,6 +134,9 @@ impl StatusBar {
       self.input = before_char_to_delete.chain(after_char_to_delete).collect();
       self.move_cursor_left();
     }
+
+    // 返回是否有字符被删除
+    is_not_cursor_leftmost
   }
 
   /// Returns the byte index based on the character position.

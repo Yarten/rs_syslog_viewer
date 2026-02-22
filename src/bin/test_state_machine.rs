@@ -27,9 +27,9 @@ fn run(terminal: &mut DefaultTerminal) -> Result<()> {
     });
 
   let edit_state = State::new("edit")
-    .input("Input")
+    .input("Input", |_| {})
     .goto_action(KeyEvent::simple(KeyCode::Enter), IDLE_STATE, |pager| {
-      let input = pager.status().get_input().unwrap();
+      let input = pager.status().get_input().unwrap().clone();
       pager.status().set_info(input);
       true
     })
