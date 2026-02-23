@@ -259,9 +259,9 @@ impl<'a> LogHubRef<'a> {
     Iter {
       iters: index
         .indexes
-        .iter()
+        .into_iter()
         .zip(self.logs.iter_mut())
-        .map(|(idx, log)| (log.filtered_iter_forward_from(tags_ref, *idx), None))
+        .map(|(idx, log)| (log.filtered_iter_forward_from(tags_ref, idx), None))
         .collect(),
       cmp: LogLine::is_older,
     }
@@ -274,9 +274,9 @@ impl<'a> LogHubRef<'a> {
     Iter {
       iters: index
         .indexes
-        .iter()
+        .into_iter()
         .zip(self.logs.iter_mut())
-        .map(|(idx, log)| (log.filtered_iter_backward_from(tags_ref, *idx), None))
+        .map(|(idx, log)| (log.filtered_iter_backward_from(tags_ref, idx), None))
         .collect(),
       cmp: LogLine::is_newer,
     }

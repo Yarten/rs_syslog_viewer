@@ -1,3 +1,4 @@
+use crate::ui::CursorExpectation;
 use crate::{
   app::{Controller, LogHubRef},
   debug,
@@ -56,11 +57,18 @@ impl DebugController {
 impl Controller for DebugController {
   fn run_once(&mut self, _: &mut LogHubRef) {
     // 响应调试区的控制，取出其中最新
-    let cursor_index = self
+    let (cursor_index, cursor_expectation) = self
       .view_port
       .apply()
-      .map(|(index, _)| *index)
-      .unwrap_or(usize::MAX);
+      .map(|((i, _), e)| (*i, e))
+      .unwrap_or((usize::MAX, CursorExpectation::None));
+
+    // 处理光标越界加载期望
+    let cursor_index = match cursor_expectation {
+      CursorExpectation::None => cursor_index,
+      CursorExpectation::MoreUp => (cursor_index as isize - 1).max(0) as usize,
+      CursorExpectation::MoreDown => cursor_index.saturating_add(1),
+    };
 
     // 取出数据，填充展示区
     self.view_port.fill(cursor_index);

@@ -63,6 +63,10 @@ impl LogPage {
   fn render_log_line<'a>(&self, log: &'a LogLine, style: Style, search: &str) -> Line<'a> {
     let mut line = Line::default();
 
+    if log.is_marked() {
+      line.push_span("🚩 ");
+    }
+
     match log {
       // 正常日志
       LogLine::Good(log) => {
@@ -86,6 +90,10 @@ impl LogPage {
 
       // 坏的日志
       LogLine::Bad(log) => line.push_span(Span::raw(&log.content).on_red()),
+    }
+
+    if log.is_marked() {
+      line.style = line.style.italic();
     }
 
     line

@@ -1,5 +1,4 @@
 use crate::log::LogDirection;
-use color_eyre::owo_colors::OwoColorize;
 use ratatui::{
   buffer::Buffer,
   layout::Rect,
@@ -68,6 +67,14 @@ pub trait CursorEx {
   }
 }
 
+/// 描述加载可视区域外的光标数据加载期望
+#[derive(Copy, Clone)]
+pub enum CursorExpectation {
+  None,
+  MoreUp,
+  MoreDown,
+}
+
 /// 扩展了 [ViewPort] 对具体数据的操作能力，以及响应控制的能力。
 pub trait ViewPortEx {
   /// 展示区每一行的数据内容
@@ -87,7 +94,7 @@ pub trait ViewPortEx {
 
   /// 在已有的数据范围内，应用本帧的控制，返回光标最终指向的数据，
   /// 一般返回的是上一帧的旧数据
-  fn apply(&mut self) -> Option<&Self::Item> {
+  fn apply(&mut self) -> Option<(&Self::Item, CursorExpectation)> {
     let control = self.control();
 
     // 重置控制量
@@ -99,7 +106,10 @@ pub trait ViewPortEx {
     // 响应控制
     match control {
       // 光标保持不动，返回光标指向的数据
-      Control::Idle => self.data().get(self.ui().cursor),
+      Control::Idle => self
+        .data()
+        .get(self.ui().cursor)
+        .map(|v| (v, CursorExpectation::None)),
 
       // 将光标拉到最顶部，跟踪最新的数据。由于本类记录的数据是落后的，并不知道最新是什么数据，因此这里返回 None
       Control::Follow => {
@@ -109,21 +119,46 @@ pub trait ViewPortEx {
 
       // 移动光标，返回光标指向的数据
       Control::MoveBySteps(n) => {
-        let cursor = (self.ui().cursor as isize + n).max(0) as usize;
-        self.ui_mut().set_cursor(cursor);
-        self.data().get(self.ui().cursor)
+        let cursor = self.ui().cursor as isize + n;
+
+        // 若光标移动位置后超出了数据范围，则会期望加载更多数据
+        let cursor_expectation = if cursor < 0 {
+          CursorExpectation::MoreUp
+        } else if cursor as usize >= self.ui().data_count {
+          CursorExpectation::MoreDown
+        } else {
+          CursorExpectation::None
+        };
+
+        self.ui_mut().set_cursor(cursor.max(0) as usize);
+        self
+          .data()
+          .get(self.ui().cursor)
+          .map(|v| (v, cursor_expectation))
       }
 
       // 向上翻页，光标置顶，返回视野里最顶层的数据，这样一来，视野里的顶层数据就会在底层
       Control::PageUp => {
+        // 以下判断条件是测试出来的结果
+        let cursor_expectation = if self.ui().height < 2 {
+          CursorExpectation::MoreUp
+        } else {
+          CursorExpectation::None
+        };
         self.ui_mut().set_cursor_at_bottom();
-        self.data().front()
+        self.data().front().map(|v| (v, cursor_expectation))
       }
 
       // 向下翻页，光标置底，返回视野里最底层的数据，这样一来，视野里的底层数据就会在顶层
       Control::PageDown => {
+        // 以下判断条件是测试出来的结果
+        let cursor_expectation = if self.ui().height < 3 {
+          CursorExpectation::MoreDown
+        } else {
+          CursorExpectation::None
+        };
         self.ui_mut().set_cursor_at_top();
-        self.data().back()
+        self.data().back().map(|v| (v, cursor_expectation))
       }
     }
   }
@@ -255,8 +290,7 @@ impl ViewPort {
   /// 设置展示区高度，同时钳制光标位置，防止越界
   pub fn set_height(&mut self, height: usize) -> &mut Self {
     self.height = height;
-    self.set_cursor(self.cursor);
-    self
+    self.set_cursor(self.cursor)
   }
 
   /// 总是跟踪到最新的日志（退出导航模式）

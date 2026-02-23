@@ -106,7 +106,7 @@ impl StatusBar {
   }
 
   /// 清空错误，返回是否真的有错误被清空
-  fn reset_error(&mut self) -> bool {
+  pub fn reset_error(&mut self) -> bool {
     if !self.error_message.is_empty() {
       self.error_message.clear();
       true

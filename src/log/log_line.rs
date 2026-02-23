@@ -304,6 +304,14 @@ impl LogLine {
     }
   }
 
+  /// 获取本日志是否被标记
+  pub fn is_marked(&self) -> bool {
+    match self {
+      Good(log) => log.marked,
+      Bad(log) => log.marked,
+    }
+  }
+
   /// 获取本行日志目标遍历方向的下一跳信息
   pub fn get_link(&self, direction: LogDirection) -> LogLink {
     match self {

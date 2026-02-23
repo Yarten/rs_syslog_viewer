@@ -1,21 +1,12 @@
 use crate::{
   app::{Controller, Index, LogHubRef, LogItem},
   log::{LogDirection, LogLine},
-  ui::CursorEx,
+  ui::CursorExpectation,
 };
 use std::{path::PathBuf, sync::Arc};
 
 /// 展示区里维护的数据条目
 type Item = (Index, LogLine);
-
-impl CursorEx for Option<&Item> {
-  type Key = Index;
-  type Value = LogLine;
-
-  fn key(self) -> Option<Self::Key> {
-    self.map(|x| x.0.clone())
-  }
-}
 
 // 定义日志展示区的可视化数据
 crate::view_port!(ViewPort, Item);
@@ -174,6 +165,15 @@ impl Style {
 enum Control {
   Idle,
 
+  /// 对光标指向的数据切换 mark 状态
+  ToggleMark,
+
+  /// 定位下一条被 mark 的日志
+  NextMarked,
+
+  /// 定位上一条被 mark 的日志
+  PrevMarked,
+
   /// 定位最近的符合搜索结果的日志
   LocateContentSearch,
 
@@ -185,7 +185,12 @@ enum Control {
 }
 
 /// 控制器的报错信息
+#[derive(Copy, Clone, Eq, PartialEq, Ord, PartialOrd)]
 pub enum Error {
+  // 跳转标记时的相关错误
+  NextMarkedNotFound,
+  PrevMarkedNotFound,
+
   // 内容搜索相关错误
   NextContentSearchNotFound,
   PrevContentSearchNotFound,
@@ -259,6 +264,18 @@ impl LogController {
     }
   }
 
+  pub fn toggle_mark(&mut self) {
+    self.control = Control::ToggleMark;
+  }
+
+  pub fn next_mark(&mut self) {
+    self.control = Control::NextMarked;
+  }
+
+  pub fn prev_mark(&mut self) {
+    self.control = Control::PrevMarked;
+  }
+
   /// 设置搜索的内容，或者设置不搜索。
   pub fn search_content(&mut self, search: Option<String>) {
     self.content_search = search;
@@ -283,18 +300,52 @@ impl LogController {
 }
 
 impl LogController {
+  /// 定位下一条被标记的日志
+  fn locate_next_marked(&mut self, data: &mut LogHubRef, index: Index) -> Index {
+    let mut iter_down = data.iter_forward_from(index.clone());
+    iter_down.next();
+    match self.find_first_marked(iter_down) {
+      None => {
+        self.error = Some(Error::NextMarkedNotFound);
+        index
+      }
+      Some(index) => index,
+    }
+  }
+
+  /// 定位上一条被标记的日志
+  fn locate_prev_marked(&mut self, data: &mut LogHubRef, index: Index) -> Index {
+    let mut iter_up = data.iter_backward_from(index.clone());
+    iter_up.next();
+    match self.find_first_marked(iter_up) {
+      None => {
+        self.error = Some(Error::PrevMarkedNotFound);
+        index
+      }
+      Some(index) => index,
+    }
+  }
+
+  /// 给定迭代器，往后遍历，寻找第一条被标记的内容
+  fn find_first_marked<'a>(&self, iter: impl Iterator<Item = LogItem<'a>>) -> Option<Index> {
+    for (index, log) in iter {
+      if log.is_marked() {
+        return Some(index);
+      }
+    }
+
+    None
+  }
+
   /// 定位最近一条搜索内容匹配的日志
   fn locate_nearest_content_search(&mut self, data: &mut LogHubRef, index: Index) -> Index {
     let (iter_down, mut iter_up) = data.iter_at(index.clone());
     iter_up.next();
 
-    match self
+    self
       .find_first_content_matched(iter_down)
       .or(self.find_first_content_matched(iter_up))
-    {
-      None => index,
-      Some(index) => index,
-    }
+      .unwrap_or_else(|| index)
   }
 
   /// 定位到下一条搜索内容匹配的日志
@@ -352,6 +403,27 @@ impl LogController {
     }
     index
   }
+
+  /// 处理光标越界期望
+  fn process_cursor_expectation(
+    data: &mut LogHubRef,
+    index: Index,
+    expectation: CursorExpectation,
+  ) -> Index {
+    match expectation {
+      CursorExpectation::None => index,
+      CursorExpectation::MoreUp => {
+        let mut iter_up = data.iter_backward_from(index.clone());
+        iter_up.next();
+        iter_up.next().map(|(index, _)| index).unwrap_or(index)
+      }
+      CursorExpectation::MoreDown => {
+        let mut iter_down = data.iter_forward_from(index.clone());
+        iter_down.next();
+        iter_down.next().map(|(index, _)| index).unwrap_or(index)
+      }
+    }
+  }
 }
 
 impl Controller for LogController {
@@ -363,14 +435,32 @@ impl Controller for LogController {
     // 取出变更历史，进行 fix(index)
 
     // 取出当前光标应指向的数据索引，同时，对光标的位置完成配置
-    let cursor_index: Index = self.view_port.apply().key_or(|| data.last_index());
+    let (cursor_index, cursor_expectation) = self
+      .view_port
+      .apply()
+      .map(|((i, _), e)| (i.clone(), e))
+      .unwrap_or_else(|| (data.last_index(), CursorExpectation::None));
 
     // 重定位索引，确保它光标总是指向可见的数据
-    let mut cursor_index = Self::ensure_cursor_valid(data, cursor_index);
+    let cursor_index = Self::ensure_cursor_valid(data, cursor_index);
+
+    // 处理光标越界的期望
+    let mut cursor_index = Self::process_cursor_expectation(data, cursor_index, cursor_expectation);
 
     // 响应控制
     match self.control {
       Control::Idle => {}
+      Control::ToggleMark => {
+        if let Some(log) = data.get(cursor_index.clone()) {
+          log.toggle_mark();
+        }
+      }
+      Control::NextMarked => {
+        cursor_index = self.locate_next_marked(data, cursor_index);
+      }
+      Control::PrevMarked => {
+        cursor_index = self.locate_prev_marked(data, cursor_index);
+      }
       Control::LocateContentSearch => {
         cursor_index = self.locate_nearest_content_search(data, cursor_index);
       }

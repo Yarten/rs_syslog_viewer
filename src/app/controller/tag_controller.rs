@@ -1,7 +1,7 @@
 use crate::{
   app::{Controller, LogHubRef},
   log::LogDirection,
-  ui::CursorEx,
+  ui::{CursorEx, CursorExpectation},
 };
 use std::collections::BTreeMap;
 
@@ -107,11 +107,22 @@ impl TagController {
 
 impl Controller for TagController {
   fn run_once(&mut self, data: &mut LogHubRef) {
-    // 响应列表区的操作，获取光标指向的数据
-    let cursor_data = self.view_port.apply().cloned();
+    // 响应列表区的操作，获取光标指向的数据。
+    // 如果取不到光标数据，重新取第一个标签作为光标的位置。
+    let cursor_data = self.view_port.apply().map(|(i, e)| (i.clone(), e));
+    let (cursor_key, cursor_expectation) = cursor_data
+      .map(|((k, _), e)| (k, e))
+      .unwrap_or((String::new(), CursorExpectation::None));
 
-    // 响应选择控制
-    self.apply_control(data, cursor_data.as_ref().map(|(k, _)| k));
+    // 响应选择控制，如果光标指向的数据存在的话。
+    self.apply_control(
+      data,
+      if cursor_key.is_empty() {
+        None
+      } else {
+        Some(&cursor_key)
+      },
+    );
 
     // 处理搜索的变更
     self.apply_search(data);
@@ -119,15 +130,11 @@ impl Controller for TagController {
     // 更新标签版本
     data.data_board().get_tags_mut().update_version();
 
+    // 重定位光标位置
+    let cursor_key = self.relocate_cursor(cursor_key, cursor_expectation);
+
     // 填充数据
-    self.view_port.fill(
-      &self.matched_tags,
-      // 保持上一帧光标的位置，或者重新取第一个标签为光标的位置
-      cursor_data
-        .map(|(k, _)| k)
-        .or_else(|| self.matched_tags.first_key_value().map(|(k, _)| k.clone()))
-        .unwrap_or(String::new()),
-    )
+    self.view_port.fill(&self.matched_tags, cursor_key)
   }
 
   fn view_port(&mut self) -> Option<&mut ViewPortBase> {
@@ -240,5 +247,32 @@ impl TagController {
         self.matched_tags.insert(k, v);
       }
     });
+  }
+
+  /// 重定位光标的位置，确保它指向的数据有效，处理其越界的希望
+  fn relocate_cursor(&self, cursor_key: String, cursor_expectation: CursorExpectation) -> String {
+    if cursor_key.is_empty() {
+      return self
+        .matched_tags
+        .first_key_value()
+        .map(|(k, _)| k.clone())
+        .unwrap_or(cursor_key);
+    }
+
+    match cursor_expectation {
+      CursorExpectation::None => cursor_key,
+      CursorExpectation::MoreUp => self
+        .matched_tags
+        .range(..cursor_key.clone())
+        .next_back()
+        .map(|(k, _)| k.clone())
+        .unwrap_or(cursor_key),
+      CursorExpectation::MoreDown => self
+        .matched_tags
+        .range(cursor_key.clone()..)
+        .nth(1)
+        .map(|(k, _)| k.clone())
+        .unwrap_or(cursor_key),
+    }
   }
 }

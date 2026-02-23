@@ -1,4 +1,5 @@
 use super::log_state_kit::LogStateKit;
+use crate::app::controller::log_controller::Error;
 use crate::ui::ViewPortEx;
 use crate::{
   app::{StateBuilder, ViewPortStateEx, controller::LogController},
@@ -42,6 +43,25 @@ impl StateBuilder for LogNavigationState {
       .action(KeyEvent::simple(KeyCode::Char('f')), |ctrl| {
         ctrl.view_mut().ui_mut().want_follow()
       })
+      .action(KeyEvent::simple(KeyCode::Char('m')), |ctrl| {
+        ctrl.toggle_mark()
+      })
+      .action(KeyEvent::simple(KeyCode::Char('[')), |ctrl| {
+        ctrl.prev_mark()
+      })
+      .action(KeyEvent::simple(KeyCode::Char(']')), |ctrl| {
+        ctrl.next_mark()
+      })
+      .errors(&[
+        (
+          Error::NextMarkedNotFound,
+          "No next marked log is found. (use [ to find previous one)",
+        ),
+        (
+          Error::PrevMarkedNotFound,
+          "No previous marked log is found. (use ] to find next one)",
+        ),
+      ])
       .state
       .view_port(c1, true)
   }
