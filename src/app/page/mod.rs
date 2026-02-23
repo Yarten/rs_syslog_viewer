@@ -1,5 +1,5 @@
 mod debug_page;
-mod log_page;
+pub mod log_page;
 mod tag_page;
 
 pub use debug_page::DebugPage;

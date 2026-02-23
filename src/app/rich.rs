@@ -153,6 +153,8 @@ struct Highlighter {
 impl Highlighter {
   fn new() -> Self {
     let url_style = Style::default().blue().underlined();
+    let number_style = Style::default().green();
+    let string_style = Style::default().magenta();
 
     Self::build(vec![
       // URL
@@ -171,18 +173,23 @@ impl Highlighter {
       // 时间
       (
         Regex::new(r"\b\d{2}:\d{2}(:\d{2}(\.\d+)?)?\b").unwrap(),
-        Style::default().magenta(),
+        Style::default().cyan(),
       ),
       // 日期
       (
         Regex::new(r"\b\d{4}-\d{2}-\d{2}\b").unwrap(),
-        Style::default().magenta(),
+        Style::default().cyan(),
       ),
       // 数字
       (
-        Regex::new(r"\b\d+(\.\d+)?\b").unwrap(),
-        Style::default().cyan(),
+        Regex::new(r"[-+]?\b\d+(\.\d+)?[a-zA-Z]?\b").unwrap(),
+        number_style,
       ),
+      (Regex::new(r"0[xX][0-9a-fA-F]+").unwrap(), number_style),
+      // 字符串
+      (Regex::new(r#""[^"]*""#).unwrap(), string_style),
+      (Regex::new(r#""[^"]*""#).unwrap(), string_style),
+      (Regex::new(r"'[^']*'").unwrap(), string_style),
     ])
   }
 

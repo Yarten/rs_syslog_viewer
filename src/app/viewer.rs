@@ -2,7 +2,7 @@ use crate::{
   app::{
     Controller, LogHub, StateBuilder,
     controller::{DebugController, LogController, TagController},
-    page::{DebugPage, LogPage, TagPage},
+    page::{DebugPage, LogPage, TagPage, log_page},
     state::{DebugOperationState, LogNavigationState, TagOperationState},
   },
   debug,
@@ -37,6 +37,9 @@ pub struct Config {
 
   /// 调试用的日志记录缓存大小
   pub debug_buffer_size: usize,
+
+  /// 日志页面的渲染配置
+  pub log_page_config: log_page::Config,
 }
 
 impl Default for Config {
@@ -47,6 +50,7 @@ impl Default for Config {
       pager_theme: Default::default(),
       sm_config: Default::default(),
       debug_buffer_size: 200,
+      log_page_config: Default::default(),
     }
   }
 }
@@ -199,7 +203,10 @@ impl Viewer {
     // ------------------------------------------
     // 构建页面
     let pager = Pager::new(config.pager_theme)
-      .add_page_as_root(LogPage { log_controller })
+      .add_page_as_root(LogPage {
+        log_controller,
+        config: config.log_page_config,
+      })
       .add_page(TAG_PAGE, TagPage { tag_controller })
       .add_page(DEBUG_PAGE, DebugPage { debug_controller });
 

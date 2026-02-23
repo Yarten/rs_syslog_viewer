@@ -1,7 +1,7 @@
 use crate::{app::LogHubRef, ui::ViewPort};
 
 mod debug_controller;
-mod log_controller;
+pub mod log_controller;
 mod tag_controller;
 
 pub use debug_controller::DebugController;

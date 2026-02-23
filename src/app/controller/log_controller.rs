@@ -35,6 +35,141 @@ impl ViewPort {
   }
 }
 
+/// 时间戳展示风格
+#[derive(Default, PartialEq, Copy, Clone)]
+pub enum TimestampStyle {
+  /// 完整时间戳信息
+  Full,
+
+  /// 不展示日期，仅展示时间，精确到毫秒
+  Time,
+
+  /// 展示月日以及时间，精确到毫秒
+  #[default]
+  MonthDayTime,
+
+  /// 仅展示时分秒
+  RoughTime,
+}
+
+impl TimestampStyle {
+  pub fn next(&mut self) {
+    *self = match self {
+      TimestampStyle::Full => TimestampStyle::Time,
+      TimestampStyle::Time => TimestampStyle::MonthDayTime,
+      TimestampStyle::MonthDayTime => TimestampStyle::RoughTime,
+      TimestampStyle::RoughTime => TimestampStyle::Full,
+    }
+  }
+}
+
+/// 标签展示风格
+#[derive(Default, PartialEq, Copy, Clone)]
+pub enum TagStyle {
+  /// 完整展示
+  #[default]
+  Full,
+
+  /// 过长在左边省略
+  OmitLeft,
+
+  /// 过长在右边省略
+  OmitRight,
+
+  /// 过长在中间省略
+  OmitMiddle,
+
+  /// 不展示
+  Hidden,
+}
+
+impl TagStyle {
+  pub fn next(&mut self) {
+    *self = match self {
+      TagStyle::Full => TagStyle::OmitLeft,
+      TagStyle::OmitLeft => TagStyle::OmitRight,
+      TagStyle::OmitRight => TagStyle::OmitMiddle,
+      TagStyle::OmitMiddle => TagStyle::Hidden,
+      TagStyle::Hidden => TagStyle::Full,
+    }
+  }
+}
+
+/// PID 展示风格
+#[derive(Default, PartialEq, Copy, Clone)]
+pub enum PidStyle {
+  /// 展示
+  Shown,
+
+  /// 不展示
+  #[default]
+  Hidden,
+}
+
+impl PidStyle {
+  pub fn next(&mut self) {
+    *self = match self {
+      PidStyle::Shown => PidStyle::Hidden,
+      PidStyle::Hidden => PidStyle::Shown,
+    }
+  }
+}
+
+/// 日志各项内容展示风格配置
+#[derive(Default, PartialEq, Copy, Clone)]
+pub struct Style {
+  pub timestamp_style: TimestampStyle,
+  pub tag_style: TagStyle,
+  pub pid_style: PidStyle,
+  type_index: usize,
+}
+
+impl Style {
+  pub fn next(&mut self) {
+    let style = match self.type_index {
+      0 => Style {
+        timestamp_style: TimestampStyle::MonthDayTime,
+        tag_style: TagStyle::Full,
+        pid_style: PidStyle::Hidden,
+        type_index: 0,
+      },
+      1 => Style {
+        timestamp_style: TimestampStyle::Time,
+        tag_style: TagStyle::OmitLeft,
+        pid_style: PidStyle::Hidden,
+        type_index: 1,
+      },
+      2 => Style {
+        timestamp_style: TimestampStyle::RoughTime,
+        tag_style: TagStyle::Hidden,
+        pid_style: PidStyle::Hidden,
+        type_index: 2,
+      },
+      3 => Style {
+        timestamp_style: TimestampStyle::Full,
+        tag_style: TagStyle::Full,
+        pid_style: PidStyle::Shown,
+        type_index: 3,
+      },
+      _ => {
+        todo!()
+      }
+    };
+
+    // 若当前选择的索引对应的风格与预设相同，则应用下一个风格，
+    // 否则先回归本索引应有的风格。
+    if style == *self {
+      self.type_index += 1;
+      if self.type_index > 3 {
+        self.type_index = 0;
+      }
+      self.next();
+    } else {
+      *self = style;
+    }
+  }
+}
+
 /// 日志展示区的控制器
 pub struct LogController {
   ///展示区的数据
@@ -42,6 +177,9 @@ pub struct LogController {
 
   /// 日志的根目录
   log_files_root: Option<Arc<PathBuf>>,
+
+  /// 日志展示风格
+  style: Style,
 }
 
 impl Default for LogController {
@@ -49,6 +187,7 @@ impl Default for LogController {
     let mut res = Self {
       view_port: Default::default(),
       log_files_root: Default::default(),
+      style: Default::default(),
     };
 
     // 默认跟踪最新日志
@@ -58,12 +197,18 @@ impl Default for LogController {
 }
 
 impl LogController {
-  /// 获得 view port 控制器
   pub fn view_mut(&mut self) -> &mut ViewPort {
     &mut self.view_port
   }
   pub fn view(&self) -> &ViewPort {
     &self.view_port
+  }
+
+  pub fn style_mut(&mut self) -> &mut Style {
+    &mut self.style
+  }
+  pub fn style(&self) -> &Style {
+    &self.style
   }
 
   /// 日志所处根目录

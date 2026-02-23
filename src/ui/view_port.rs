@@ -165,13 +165,11 @@ pub trait ViewPortRenderEx: ViewPortEx {
     let items: Vec<ListItem> = self.data().iter().map(|i| f(i)).collect();
 
     // 渲染
-    List::new(items)
-      .highlight_style(if focus {
-        Style::default().bg(Color::Blue)
-      } else {
-        Style::default().bg(Color::Gray)
-      })
-      .render(area, buf, &mut state);
+    let mut list = List::new(items);
+    if focus {
+      list = list.highlight_style(Style::default().bg(Color::Blue));
+    }
+    list.render(area, buf, &mut state);
 
     // 由于现在访问得到的 controller 数据都是基于之前的事实计算的，
     // 因此，我们只能在渲染的最后，再给 controller 更新最新的窗口大小

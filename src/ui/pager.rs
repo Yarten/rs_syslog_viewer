@@ -3,6 +3,7 @@ use ratatui::{
   Frame,
   buffer::Buffer,
   layout::{Alignment, Constraint, Layout, Position, Rect},
+  prelude::*,
   style::{Color, Style},
   widgets::{Block, BorderType, Borders, Paragraph, Widget},
 };
@@ -122,7 +123,7 @@ pub struct Theme {
 impl Default for Theme {
   fn default() -> Self {
     Self {
-      bg: Color::DarkGray,
+      bg: Color::Black,
       full_page: PageTheme::full(),
       half_page: PageTheme::half(),
       status_bar: status_bar::Theme::default(),
@@ -487,7 +488,7 @@ impl Pager {
     block: Block,
     state: &PageState,
   ) {
-    let block = block.title(page.title());
+    let block = block.title(page.title()).bg(self.theme.bg);
     let inner_area = block.inner(area);
     block.render(area, buf);
     page.render(inner_area, buf, state);
