@@ -59,8 +59,8 @@ impl Page for LogPage {
 
 impl LogPage {
   /// 为给定的日志行，创建可渲染的列表项
-  fn render_log_line<'a>(&self, log: &'a LogLine, style: Style) -> ListItem<'a> {
-    let mut line = text::Line::default();
+  fn render_log_line<'a>(&self, log: &'a LogLine, style: Style) -> Line<'a> {
+    let mut line = Line::default();
 
     match log {
       // 正常日志
@@ -87,7 +87,7 @@ impl LogPage {
       LogLine::Bad(log) => line.push_span(Span::raw(&log.content).on_red()),
     }
 
-    ListItem::new(line)
+    line
   }
 
   fn get_timestamp_span<'a>(&self, style: &Style, dt: &DateTime<FixedOffset>) -> Span<'a> {

@@ -24,6 +24,6 @@ impl DebugOperationState {
 
 impl StateBuilder for DebugOperationState {
   fn build(self) -> State {
-    self.state.view_port(self.debug_controller)
+    self.state.view_port(self.debug_controller, true)
   }
 }

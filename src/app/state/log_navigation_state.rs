@@ -49,6 +49,6 @@ impl StateBuilder for LogNavigationState {
         ctrl.style_mut().pid_style.next()
       })
       .state
-      .view_port(c1)
+      .view_port(c1, true)
   }
 }

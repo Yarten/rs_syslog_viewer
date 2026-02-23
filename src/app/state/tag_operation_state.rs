@@ -42,7 +42,7 @@ impl StateBuilder for TagOperationState {
       .action(KeyEvent::ctrl('n'), |ctrl| ctrl.unset_all())
       .action(KeyEvent::ctrl('h'), |ctrl| ctrl.toggle_all())
       .state
-      .view_port(c1)
+      .view_port(c1, false)
       .input("Tags", move |s| c2.borrow_mut().search(s.to_string()))
       .enter_action(move |pager| {
         pager

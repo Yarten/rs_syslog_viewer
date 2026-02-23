@@ -1,9 +1,11 @@
 use crate::log::LogDirection;
+use color_eyre::owo_colors::OwoColorize;
 use ratatui::{
   buffer::Buffer,
   layout::Rect,
-  prelude::{Color, Style},
-  widgets::{List, ListItem, ListState, StatefulWidget},
+  prelude::*,
+  symbols,
+  widgets::{Paragraph, Scrollbar, ScrollbarOrientation, ScrollbarState},
 };
 use std::collections::VecDeque;
 
@@ -45,6 +47,10 @@ pub struct ViewPort {
 
   /// 当帧需要处理的控制
   pub control: Control,
+
+  /// 横向滚动条当前的位置。它的总长度将动态计算，位置也会动态钳制。
+  /// 如果位置设置为 None，则没有横向滚动能力。
+  horizontal_scroll_position: Option<usize>,
 }
 
 /// 扩展 view port 数据的能力，假设了 view port 数据是由 Key 和 Value 组成的元组
@@ -93,7 +99,7 @@ pub trait ViewPortEx {
     // 响应控制
     match control {
       // 光标保持不动，返回光标指向的数据
-      Control::Idle => self.data().get(self.ui().cursor()),
+      Control::Idle => self.data().get(self.ui().cursor),
 
       // 将光标拉到最顶部，跟踪最新的数据。由于本类记录的数据是落后的，并不知道最新是什么数据，因此这里返回 None
       Control::Follow => {
@@ -103,9 +109,9 @@ pub trait ViewPortEx {
 
       // 移动光标，返回光标指向的数据
       Control::MoveBySteps(n) => {
-        let cursor = (self.ui().cursor() as isize + n).max(0) as usize;
+        let cursor = (self.ui().cursor as isize + n).max(0) as usize;
         self.ui_mut().set_cursor(cursor);
-        self.data().get(self.ui().cursor())
+        self.data().get(self.ui().cursor)
       }
 
       // 向上翻页，光标置顶，返回视野里最顶层的数据，这样一来，视野里的顶层数据就会在底层
@@ -150,37 +156,96 @@ pub trait ViewPortEx {
 
 /// 扩展 [ViewPort] 渲染到终端的能力
 pub trait ViewPortRenderEx: ViewPortEx {
-  fn render(
-    &mut self,
-    area: Rect,
-    buf: &mut Buffer,
-    focus: bool,
-    f: impl Fn(&Self::Item) -> ListItem,
-  ) {
-    // 构建 list state
-    let mut state = ListState::default();
-    state.select(Some(self.ui().cursor()));
-
+  fn render(&mut self, area: Rect, buf: &mut Buffer, focus: bool, f: impl Fn(&Self::Item) -> Line) {
     // 组装渲染条目
-    let items: Vec<ListItem> = self.data().iter().map(|i| f(i)).collect();
+    let mut items: Vec<Line> = self.data().iter().map(|i| f(i)).collect();
 
-    // 渲染
-    let mut list = List::new(items);
-    if focus {
-      list = list.highlight_style(Style::default().bg(Color::Blue));
+    // 调整并渲染横向滚动条的位置。该滚动条不一定想要渲染，取决于 UI 数据中是否记录了它先前的位置。
+    let mut horizontal_scroll_position = self.ui().horizontal_scroll_position;
+
+    if let Some(pos) = horizontal_scroll_position.as_mut() {
+      // 计算当前行最大宽度
+      let width = items.iter().map(|line| line.width()).max().unwrap_or(0) + 10;
+
+      // 可滚动的范围
+      let area_width = area.width as usize;
+      let scroll_range = if width > area_width {
+        width - area_width
+      } else {
+        0
+      };
+
+      // 确保滚动条位置在可滚动范围内
+      *pos = scroll_range.saturating_sub(1).min(*pos);
+
+      // 仅当内容宽度大于可渲染范围时，渲染滚动条。滚动条将重叠在底部边框上。
+      if scroll_range > 0 {
+        let mut state = ScrollbarState::new(scroll_range).position(*pos);
+        Scrollbar::new(ScrollbarOrientation::HorizontalBottom)
+          .symbols(symbols::scrollbar::Set {
+            track: "-",
+            thumb: "▮",
+            begin: "<",
+            end: ">",
+          })
+          .thumb_style(Style::default().yellow())
+          .track_style(Style::default().yellow())
+          .begin_style(Color::Red)
+          .end_style(Color::Red)
+          .render(
+            area.outer(Margin {
+              vertical: 1,
+              horizontal: 0,
+            }),
+            buf,
+            &mut state,
+          );
+      }
     }
-    list.render(area, buf, &mut state);
+
+    // 高亮光标指向的数据
+    if focus && let Some(line) = items.get_mut(self.ui().cursor) {
+      // 若本行的宽度小于可视区的宽度，我们需要在其后方补充空白格，否则高亮区域没法横穿整个行，看起来会比较奇怪。
+      // 本来用 List 渲染可以自动解决这个问题，但它不支持 scrollbar ，因此我们只能手动实现下。
+      let line_width = line.width();
+      if line_width < area.width as usize {
+        line.push_span(Span::raw(" ".repeat(area.width as usize - line_width)));
+      }
+
+      line.style = line.style.bg(Color::Blue);
+    }
+
+    // 渲染展示区内容
+    let mut content = Paragraph::new(items);
+    if let Some(pos) = horizontal_scroll_position {
+      content = content.scroll((0, pos as u16));
+    }
+    content.render(area, buf);
+
+    // 更新 UI 数据
+    let ui = self.ui_mut();
+
+    // 更新滚动条位置
+    ui.horizontal_scroll_position = horizontal_scroll_position;
 
     // 由于现在访问得到的 controller 数据都是基于之前的事实计算的，
     // 因此，我们只能在渲染的最后，再给 controller 更新最新的窗口大小
-    self.ui_mut().set_height(area.height as usize);
+    ui.set_height(area.height as usize);
   }
 }
 
 impl ViewPort {
-  /// 光标的数据索引
-  pub fn cursor(&self) -> usize {
-    self.cursor
+  /// 启用横向滚动条
+  pub fn enable_horizontal_scroll(&mut self) {
+    self.horizontal_scroll_position = Some(0);
+  }
+
+  /// 移动横向滚动条，向左为负，向右为正。
+  /// 不用担心会不会超出内容范围，在渲染时会钳制
+  pub fn want_scroll_horizontally(&mut self, steps: isize) {
+    if let Some(pos) = self.horizontal_scroll_position.as_mut() {
+      *pos = (*pos as isize + steps).max(0) as usize;
+    }
   }
 
   /// 设置展示区高度，同时钳制光标位置，防止越界

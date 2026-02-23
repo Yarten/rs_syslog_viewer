@@ -6,8 +6,7 @@ use ratatui::{
   buffer::Buffer,
   layout::Rect,
   style::{Color, Style, Styled},
-  text::{self, Span},
-  widgets::ListItem,
+  text::Line,
 };
 use std::{borrow::Cow, cell::RefCell, rc::Rc};
 
@@ -34,8 +33,8 @@ impl Page for TagPage {
 }
 
 impl TagPage {
-  fn render_tag<'a>(&self, tag: &'a str, state: bool, search: &str) -> ListItem<'a> {
-    let mut line = text::Line::default();
+  fn render_tag<'a>(&self, tag: &'a str, state: bool, search: &str) -> Line<'a> {
+    let mut line = Line::default();
 
     // 标识是否选中该标签的复选框
     let checkbox_style = Style::default().bg(Color::DarkGray).white().bold();
@@ -50,6 +49,6 @@ impl TagPage {
     // 标签内容本身
     rich(&mut line, tag, search);
 
-    ListItem::new(line)
+    line
   }
 }

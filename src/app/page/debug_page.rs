@@ -4,6 +4,7 @@ use crate::{
   ui::{Page, PageState, ViewPortRenderEx},
 };
 use chrono::Timelike;
+use ratatui::text::Line;
 use ratatui::{
   buffer::Buffer,
   layout::Rect,
@@ -32,8 +33,8 @@ impl Page for DebugPage {
 }
 
 impl DebugPage {
-  fn render_item<'a>(&self, item: &'a Item) -> ListItem<'a> {
-    let mut line = text::Text::default();
+  fn render_item<'a>(&self, item: &'a Item) -> Line<'a> {
+    let mut line = text::Line::default();
 
     line.push_span(
       format!(
@@ -54,6 +55,6 @@ impl DebugPage {
     };
     line.push_span(Span::raw(&item.content).fg(color));
 
-    ListItem::new(line)
+    line
   }
 }

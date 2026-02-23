@@ -20,11 +20,11 @@ pub trait StateBuilder {
 
 /// 用于扩展 State 以支持数据导航能力
 pub trait ViewPortStateEx {
-  fn view_port(self, ctrl: Rc<RefCell<dyn Controller>>) -> Self;
+  fn view_port(self, ctrl: Rc<RefCell<dyn Controller>>, scrollable: bool) -> Self;
 }
 
 impl ViewPortStateEx for State {
-  fn view_port(mut self, ctrl: Rc<RefCell<dyn Controller>>) -> Self {
+  fn view_port(mut self, ctrl: Rc<RefCell<dyn Controller>>, scrollable: bool) -> Self {
     fn action(
       state: State,
       code: KeyCode,
@@ -36,6 +36,19 @@ impl ViewPortStateEx for State {
           act(view_port);
         }
       })
+    }
+
+    // 启用横向滚动条能力，配置相关按键事件。
+    if scrollable {
+      if let Some(view_port) = ctrl.borrow_mut().view_port() {
+        view_port.enable_horizontal_scroll();
+        self = action(self, KeyCode::Left, ctrl.clone(), |v| {
+          v.want_scroll_horizontally(-1)
+        });
+        self = action(self, KeyCode::Right, ctrl.clone(), |v| {
+          v.want_scroll_horizontally(1)
+        });
+      }
     }
 
     self = action(self, KeyCode::Up, ctrl.clone(), |v| v.want_move_cursor(-1));
