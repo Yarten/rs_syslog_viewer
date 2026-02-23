@@ -1,5 +1,5 @@
 use crate::{
-  app::{Controller, Index, LogHubRef},
+  app::{Controller, Index, LogHubRef, LogItem},
   log::{LogDirection, LogLine},
   ui::CursorEx,
 };
@@ -170,6 +170,27 @@ impl Style {
   }
 }
 
+/// 日志区的控制量
+enum Control {
+  Idle,
+
+  /// 定位最近的符合搜索结果的日志
+  LocateContentSearch,
+
+  /// 下一条符合搜索结果的日志
+  NextContentSearch,
+
+  /// 上一条符合搜索结果的日志
+  PrevContentSearch,
+}
+
+/// 控制器的报错信息
+pub enum Error {
+  // 内容搜索相关错误
+  NextContentSearchNotFound,
+  PrevContentSearchNotFound,
+}
+
 /// 日志展示区的控制器
 pub struct LogController {
   ///展示区的数据
@@ -180,6 +201,15 @@ pub struct LogController {
 
   /// 日志展示风格
   style: Style,
+
+  /// 本帧控制
+  control: Control,
+
+  /// 本帧报错
+  error: Option<Error>,
+
+  /// 搜索的内容。为 None 时，说明当前不处于搜索状态。
+  content_search: Option<String>,
 }
 
 impl Default for LogController {
@@ -188,6 +218,9 @@ impl Default for LogController {
       view_port: Default::default(),
       log_files_root: Default::default(),
       style: Default::default(),
+      control: Control::Idle,
+      error: None,
+      content_search: None,
     };
 
     // 默认跟踪最新日志
@@ -211,6 +244,10 @@ impl LogController {
     &self.style
   }
 
+  pub fn take_error(&mut self) -> Option<Error> {
+    self.error.take()
+  }
+
   /// 日志所处根目录
   pub fn logs_root(&self) -> &str {
     if let Some(root) = &self.log_files_root
@@ -222,8 +259,88 @@ impl LogController {
     }
   }
 
+  /// 设置搜索的内容，或者设置不搜索。
+  pub fn search_content(&mut self, search: Option<String>) {
+    self.content_search = search;
+    self.control = Control::LocateContentSearch;
+  }
+
+  /// 跳转到下一条搜索匹配的日志
+  pub fn next_content_search(&mut self) {
+    self.control = Control::NextContentSearch;
+  }
+
+  /// 跳转到上一条搜索匹配的日志
+  pub fn prev_content_search(&mut self) {
+    self.control = Control::PrevContentSearch;
+  }
+
+  /// 获取搜素中的内容
+  pub fn get_search_content(&self) -> &str {
+    static EMPTY: String = String::new();
+    self.content_search.as_ref().unwrap_or(&EMPTY)
+  }
+}
+
+impl LogController {
+  /// 定位最近一条搜索内容匹配的日志
+  fn locate_nearest_content_search(&mut self, data: &mut LogHubRef, index: Index) -> Index {
+    let (iter_down, mut iter_up) = data.iter_at(index.clone());
+    iter_up.next();
+
+    match self
+      .find_first_content_matched(iter_down)
+      .or(self.find_first_content_matched(iter_up))
+    {
+      None => index,
+      Some(index) => index,
+    }
+  }
+
+  /// 定位到下一条搜索内容匹配的日志
+  fn locate_next_content_search(&mut self, data: &mut LogHubRef, index: Index) -> Index {
+    let mut iter_down = data.iter_forward_from(index.clone());
+    iter_down.next();
+    match self.find_first_content_matched(iter_down) {
+      None => {
+        self.error = Some(Error::NextContentSearchNotFound);
+        index
+      }
+      Some(index) => index,
+    }
+  }
+
+  /// 定位到上一条搜索内容匹配的日志
+  fn locate_prev_content_search(&mut self, data: &mut LogHubRef, index: Index) -> Index {
+    let mut iter_up = data.iter_backward_from(index.clone());
+    iter_up.next();
+    match self.find_first_content_matched(iter_up) {
+      None => {
+        self.error = Some(Error::PrevContentSearchNotFound);
+        index
+      }
+      Some(index) => index,
+    }
+  }
+
+  /// 给定迭代器，往后遍历，寻找第一条匹配搜索内容的日志
+  fn find_first_content_matched<'a>(
+    &self,
+    iter: impl Iterator<Item = LogItem<'a>>,
+  ) -> Option<Index> {
+    let search = self.content_search.as_ref()?;
+
+    for (index, log) in iter {
+      if log.get_content().find(search).is_some() {
+        return Some(index);
+      }
+    }
+
+    None
+  }
+
   /// 定位光标指向的数据索引。因为可能标签过滤规则的变化，会导致原来光标指向的数据不可见了
-  fn relocate_cursor_index(data: &mut LogHubRef, index: Index) -> Index {
+  fn ensure_cursor_valid(data: &mut LogHubRef, index: Index) -> Index {
     let (mut iter_down, mut iter_up) = data.iter_at(index.clone());
     match iter_down.next() {
       None => {}
@@ -249,7 +366,22 @@ impl Controller for LogController {
     let cursor_index: Index = self.view_port.apply().key_or(|| data.last_index());
 
     // 重定位索引，确保它光标总是指向可见的数据
-    let cursor_index = Self::relocate_cursor_index(data, cursor_index);
+    let mut cursor_index = Self::ensure_cursor_valid(data, cursor_index);
+
+    // 响应控制
+    match self.control {
+      Control::Idle => {}
+      Control::LocateContentSearch => {
+        cursor_index = self.locate_nearest_content_search(data, cursor_index);
+      }
+      Control::NextContentSearch => {
+        cursor_index = self.locate_next_content_search(data, cursor_index);
+      }
+      Control::PrevContentSearch => {
+        cursor_index = self.locate_prev_content_search(data, cursor_index);
+      }
+    }
+    self.control = Control::Idle;
 
     // 基于当前的光标位置，及其指向的数据索引，填充整个展示区
     self.view_port.fill(data, cursor_index);

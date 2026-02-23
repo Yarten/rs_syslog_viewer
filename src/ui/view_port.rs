@@ -160,6 +160,7 @@ pub trait ViewPortRenderEx: ViewPortEx {
     // 组装渲染条目
     let mut items: Vec<Line> = self.data().iter().map(|i| f(i)).collect();
 
+    // -----------------------------------------------------------
     // 调整并渲染横向滚动条的位置。该滚动条不一定想要渲染，取决于 UI 数据中是否记录了它先前的位置。
     let mut horizontal_scroll_position = self.ui().horizontal_scroll_position;
 
@@ -203,6 +204,7 @@ pub trait ViewPortRenderEx: ViewPortEx {
       }
     }
 
+    // -----------------------------------------------------------
     // 高亮光标指向的数据
     if focus && let Some(line) = items.get_mut(self.ui().cursor) {
       // 若本行的宽度小于可视区的宽度，我们需要在其后方补充空白格，否则高亮区域没法横穿整个行，看起来会比较奇怪。
@@ -215,6 +217,7 @@ pub trait ViewPortRenderEx: ViewPortEx {
       line.style = line.style.bg(Color::Blue);
     }
 
+    // -----------------------------------------------------------
     // 渲染展示区内容
     let mut content = Paragraph::new(items);
     if let Some(pos) = horizontal_scroll_position {
@@ -222,6 +225,7 @@ pub trait ViewPortRenderEx: ViewPortEx {
     }
     content.render(area, buf);
 
+    // -----------------------------------------------------------
     // 更新 UI 数据
     let ui = self.ui_mut();
 
@@ -258,6 +262,11 @@ impl ViewPort {
   /// 总是跟踪到最新的日志（退出导航模式）
   pub fn want_follow(&mut self) {
     self.control = Control::Follow;
+  }
+
+  /// 不要跟踪最新日志
+  pub fn do_not_follow(&mut self) {
+    self.control = Control::Idle;
   }
 
   /// 按步移动光标

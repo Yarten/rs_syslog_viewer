@@ -333,6 +333,14 @@ impl LogLine {
       Bad(_) => None,
     }
   }
+
+  /// 获取日志内容
+  pub fn get_content(&self) -> &str {
+    match self {
+      Good(log) => &log.message,
+      Bad(log) => &log.content,
+    }
+  }
 }
 
 #[cfg(test)]

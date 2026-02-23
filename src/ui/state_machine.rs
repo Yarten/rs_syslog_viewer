@@ -1,4 +1,4 @@
-use crate::ui::{KeyEventEx, Pager};
+use crate::ui::{Event as UiEvent, KeyEventEx, Pager};
 use crossterm::event::{self, Event, KeyCode, KeyEvent, KeyModifiers};
 use std::{collections::HashMap, time::Duration};
 
@@ -33,6 +33,15 @@ struct InputMode {
   handler: InputHandler,
 }
 
+/// 状态机工作产生的事件
+enum SmEvent {
+  /// UI 事件
+  Some(UiEvent),
+
+  /// 状态跳转
+  Jump(usize),
+}
+
 /// 状态机中的一个状态
 pub struct State {
   /// 状态的名称，仅用于调试。在状态机中索引状态，使用的是整数
@@ -46,10 +55,13 @@ pub struct State {
   transitions: Vec<Transition>,
 
   /// 进入该状态时，执行的动作
-  enter_action: Vec<Action>,
+  enter_actions: Vec<Action>,
 
   /// 离开该状态时，执行的动作
-  leave_action: Vec<Action>,
+  leave_actions: Vec<Action>,
+
+  /// 需要手动调用的动作
+  manual_actions: Vec<Action>,
 }
 
 impl State {
@@ -61,8 +73,9 @@ impl State {
       name: name.into(),
       input_mode: None,
       transitions: Vec::new(),
-      enter_action: Vec::new(),
-      leave_action: Vec::new(),
+      enter_actions: Vec::new(),
+      leave_actions: Vec::new(),
+      manual_actions: Vec::new(),
     }
   }
 
@@ -114,7 +127,7 @@ impl State {
   where
     F: FnMut(&mut Pager) + 'static,
   {
-    self.enter_action.push(Box::new(act));
+    self.enter_actions.push(Box::new(act));
     self
   }
 
@@ -123,7 +136,16 @@ impl State {
   where
     F: FnMut(&mut Pager) + 'static,
   {
-    self.leave_action.push(Box::new(act));
+    self.leave_actions.push(Box::new(act));
+    self
+  }
+
+  /// 设置需要手动调用的动作
+  pub fn manual_action<F>(mut self, act: F) -> Self
+  where
+    F: FnMut(&mut Pager) + 'static,
+  {
+    self.manual_actions.push(Box::new(act));
     self
   }
 }
@@ -140,43 +162,43 @@ impl State {
       pager.status().set_input(state.prompt.clone());
     }
 
-    for act in self.enter_action.iter_mut() {
+    for act in self.enter_actions.iter_mut() {
       act(pager);
     }
   }
 
   /// 离开状态时，执行的处理
   fn leave(&mut self, pager: &mut Pager) {
-    for act in self.leave_action.iter_mut() {
+    for act in self.leave_actions.iter_mut() {
       act(pager);
     }
   }
 
   /// 响应处理键入的事件，返回是否进行状态跳转
-  fn react(&mut self, pager: &mut Pager, event: KeyEvent) -> Option<usize> {
+  fn react(&mut self, pager: &mut Pager, event: KeyEvent) -> SmEvent {
     // 处理 repeat 的情况，防止触发过快（一般也不会默认使能这个特性）
     if event.is_repeat() {
-      return None;
+      return SmEvent::Some(UiEvent::Tick);
     }
 
     // 优先处理输入的相关的事件
     if self.handle_input(pager, event).is_some() {
-      return None;
+      return SmEvent::Some(UiEvent::Some);
     }
 
     // 从前往后逐一对比事件响应条件，命中第一个时进行处理
     for t in self.transitions.iter_mut() {
       if t.event.same_as(&event) {
         return if (t.act)(pager) {
-          Some(t.next_state)
+          SmEvent::Jump(t.next_state)
         } else {
-          None
+          SmEvent::Some(UiEvent::Some)
         };
       }
     }
 
     // 没有找到任何预设的事件
-    None
+    SmEvent::Some(UiEvent::Tick)
   }
 
   /// 处理输入事件。如果事件被消耗，返回 true
@@ -280,23 +302,25 @@ impl StateMachine {
   }
 
   /// 等待事件，并进行处理，返回是否结束程序
-  pub fn poll_once(&mut self, pager: &mut Pager) -> bool {
+  pub fn poll_once(&mut self, pager: &mut Pager) -> UiEvent {
     match event::poll(self.poll_interval) {
       // 有键入事件，分析是否是 ctrl+c，是则结束程序，
       // 否则响应处理
       Ok(true) => match event::read() {
         // 处理键盘事件
-        Ok(Event::Key(event)) => match event {
-          // ctrl+c/C 退出进程
-          KeyEvent {
-            code: KeyCode::Char('c') | KeyCode::Char('C'),
-            modifiers: KeyModifiers::CONTROL,
-            ..
-          } => return true,
+        Ok(Event::Key(event)) => {
+          return match event {
+            // ctrl+c/C 退出进程
+            KeyEvent {
+              code: KeyCode::Char('c') | KeyCode::Char('C'),
+              modifiers: KeyModifiers::CONTROL,
+              ..
+            } => UiEvent::Quit,
 
-          // 处理状态流转，程序继续运行
-          event => self.manage_once(pager, event),
-        },
+            // 处理状态流转，程序继续运行
+            event => self.manage_once(pager, event),
+          };
+        }
 
         // 非键盘事件，全部忽略，程序继续运行
         Ok(_) => {}
@@ -313,14 +337,25 @@ impl StateMachine {
     }
 
     // 程序继续运行
-    false
+    UiEvent::Tick
   }
 
-  fn manage_once(&mut self, pager: &mut Pager, event: KeyEvent) {
+  /// 运行当前状态的 manual actions
+  pub fn run_manual_actions(&mut self, pager: &mut Pager) {
+    for act in self.get_current_state().manual_actions.iter_mut() {
+      act(pager);
+    }
+  }
+
+  fn manage_once(&mut self, pager: &mut Pager, event: KeyEvent) -> UiEvent {
     let event = KeyEvent::platform_consistent(event);
-    if let Some(next_state_index) = self.get_current_state().react(pager, event) {
-      self.leave_current(pager);
-      self.enter(pager, next_state_index);
+    match self.get_current_state().react(pager, event) {
+      SmEvent::Some(event) => event,
+      SmEvent::Jump(next_state_index) => {
+        self.leave_current(pager);
+        self.enter(pager, next_state_index);
+        UiEvent::Some
+      }
     }
   }
 

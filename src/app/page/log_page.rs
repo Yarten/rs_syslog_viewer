@@ -42,13 +42,14 @@ pub struct LogPage {
 impl Page for LogPage {
   fn render(&self, area: Rect, buf: &mut Buffer, state: &PageState) {
     let style = *self.log_controller.borrow().style();
+    let search = crate::unsafe_ref!(str, self.log_controller.borrow().get_search_content());
 
     self
       .log_controller
       .borrow_mut()
       .view_mut()
       .render(area, buf, state.focus, |(_, i)| {
-        self.render_log_line(i, style)
+        self.render_log_line(i, style, search)
       });
   }
 
@@ -59,7 +60,7 @@ impl Page for LogPage {
 
 impl LogPage {
   /// 为给定的日志行，创建可渲染的列表项
-  fn render_log_line<'a>(&self, log: &'a LogLine, style: Style) -> Line<'a> {
+  fn render_log_line<'a>(&self, log: &'a LogLine, style: Style, search: &str) -> Line<'a> {
     let mut line = Line::default();
 
     match log {
@@ -80,7 +81,7 @@ impl LogPage {
           line.push_span(Span::raw(" "));
         }
 
-        rich(&mut line, &log.message, "");
+        rich(&mut line, &log.message, search);
       }
 
       // 坏的日志

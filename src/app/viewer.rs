@@ -1,9 +1,13 @@
+use crate::ui::Event;
 use crate::{
   app::{
     Controller, LogHub, StateBuilder,
     controller::{DebugController, LogController, TagController},
     page::{DebugPage, LogPage, TagPage, log_page},
-    state::{DebugOperationState, LogNavigationState, TagOperationState},
+    state::{
+      DebugOperationState, LogContentSearchedState, LogContentSearchingState, LogNavigationState,
+      TagOperationState,
+    },
   },
   debug,
   log::Config as LogConfig,
@@ -79,6 +83,8 @@ struct StateMachineBuilder {
   log_nav_state: State,
   tag_nav_state: State,
   debug_nav_state: State,
+  log_content_searching_state: State,
+  log_content_searched_state: State,
 }
 
 impl StateMachineBuilder {
@@ -86,8 +92,11 @@ impl StateMachineBuilder {
     const LOG_NAV_STATE: usize = 1;
     const TAG_NAV_STATE: usize = 2;
     const DEBUG_NAV_STATE: usize = 3;
+    const LOG_CONTENT_SEARCHING_STATE: usize = 4;
+    const LOG_CONTENT_SEARCHED_STATE: usize = 5;
 
     StateMachine::new(self.sm_config)
+      // -------------------------------------------------
       // 根状态，也即日志导航状态
       .root_state(
         LOG_NAV_STATE,
@@ -116,8 +125,14 @@ impl StateMachineBuilder {
               true
             },
           )
-          .action(KeyEvent::ctrl('d'), |pager| pager.toggle_right(DEBUG_PAGE)),
+          .action(KeyEvent::ctrl('d'), |pager| pager.toggle_right(DEBUG_PAGE))
+          // 按 / 进入内容搜索状态
+          .goto(
+            KeyEvent::simple(KeyCode::Char('/')),
+            LOG_CONTENT_SEARCHING_STATE,
+          ),
       )
+      // -------------------------------------------------
       // 标签导航状态
       .state(
         TAG_NAV_STATE,
@@ -126,6 +141,7 @@ impl StateMachineBuilder {
           .enter_action(|pager| pager.focus(TAG_PAGE))
           .goto(KeyEvent::simple(KeyCode::Esc), LOG_NAV_STATE),
       )
+      // -------------------------------------------------
       // 调试界面状态
       .state(
         DEBUG_NAV_STATE,
@@ -137,6 +153,30 @@ impl StateMachineBuilder {
           })
           .goto(KeyEvent::simple(KeyCode::Esc), LOG_NAV_STATE)
           .goto(KeyEvent::simple(KeyCode::Char('d')), LOG_NAV_STATE),
+      )
+      // -------------------------------------------------
+      // 日志内容搜索输入状态
+      .state(
+        LOG_CONTENT_SEARCHING_STATE,
+        self
+          .log_content_searching_state
+          .goto(KeyEvent::simple(KeyCode::Esc), LOG_NAV_STATE)
+          .goto_action(
+            KeyEvent::simple(KeyCode::Enter),
+            LOG_CONTENT_SEARCHED_STATE,
+            |pager| match pager.status().get_input() {
+              None => false,
+              Some(input) => !input.is_empty(),
+            },
+          ),
+      )
+      // -------------------------------------------------
+      // 基于日志搜索的内容进行导航的状态
+      .state(
+        LOG_CONTENT_SEARCHED_STATE,
+        self
+          .log_content_searched_state
+          .goto(KeyEvent::simple(KeyCode::Esc), LOG_NAV_STATE),
       )
   }
 }
@@ -197,6 +237,8 @@ impl Viewer {
       log_nav_state: LogNavigationState::new(log_controller.clone()).build(),
       tag_nav_state: TagOperationState::new(tag_controller.clone()).build(),
       debug_nav_state: DebugOperationState::new(debug_controller.clone()).build(),
+      log_content_searching_state: LogContentSearchingState::new(log_controller.clone()).build(),
+      log_content_searched_state: LogContentSearchedState::new(log_controller.clone()).build(),
     }
     .build();
 
@@ -228,7 +270,8 @@ impl Viewer {
     // 数据处理与渲染循环
     loop {
       // 等待键盘事件，并响应它们。检查是否收到全局的退出信号，是则结束循环
-      if self.sm.poll_once(&mut self.pager) {
+      let event = self.sm.poll_once(&mut self.pager);
+      if event == Event::Quit {
         return Ok(());
       }
 
@@ -245,6 +288,12 @@ impl Viewer {
           }
         }
       } // 日志数据处理结束，异步读取流程将自动运行。
+
+      // 如果有事件发生，则执行当前状态的自定义动作。
+      // 这里可以用于为状态栏展示 controller 里设置的错误信息。
+      if event != Event::Tick {
+        self.sm.run_manual_actions(&mut self.pager);
+      }
 
       // 渲染页面，此时用的数据已经拷贝到各个控制器中
       terminal.draw(|frame| self.pager.render(frame))?;

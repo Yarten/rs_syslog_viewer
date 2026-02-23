@@ -1,10 +1,9 @@
 use color_eyre::Result;
-use crossterm::event::{self, KeyCode, KeyEvent, KeyModifiers};
+use crossterm::event::{KeyCode, KeyEvent};
 use ratatui::DefaultTerminal;
-use rs_syslog_viewer::ui::{DemoPage, KeyEventEx, Pager, State, StateMachine};
+use rs_syslog_viewer::ui::{DemoPage, Event, KeyEventEx, Pager, State, StateMachine};
 use std::cell::RefCell;
 use std::rc::Rc;
-use std::time::Duration;
 
 fn run(terminal: &mut DefaultTerminal) -> Result<()> {
   let quit_flag = Rc::new(RefCell::new(false));
@@ -61,7 +60,7 @@ fn run(terminal: &mut DefaultTerminal) -> Result<()> {
 
   sm.first_run(&mut pager);
   loop {
-    if sm.poll_once(&mut pager) || *quit_flag.borrow() {
+    if sm.poll_once(&mut pager) == Event::Quit || *quit_flag.borrow() {
       return Ok(());
     }
 

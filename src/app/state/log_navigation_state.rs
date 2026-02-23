@@ -1,3 +1,5 @@
+use super::log_state_kit::LogStateKit;
+use crate::ui::ViewPortEx;
 use crate::{
   app::{StateBuilder, ViewPortStateEx, controller::LogController},
   ui::{KeyEventEx, State},
@@ -7,35 +9,24 @@ use std::{cell::RefCell, rc::Rc};
 
 /// 处理日志浏览导航的状态
 pub struct LogNavigationState {
-  /// 日志数据控制器
-  log_controller: Rc<RefCell<LogController>>,
-
-  /// 被构建的状态
-  state: State,
+  kit: LogStateKit,
 }
 
 impl LogNavigationState {
   pub fn new(log_controller: Rc<RefCell<LogController>>) -> Self {
     Self {
-      log_controller,
-      state: State::new("log navigation"),
+      kit: LogStateKit::new(log_controller, "log navigation"),
     }
-  }
-
-  fn action(mut self, event: KeyEvent, act: impl Fn(&mut LogController) + 'static) -> Self {
-    let ctrl = self.log_controller.clone();
-    self.state = self.state.action(event, move |_| {
-      act(&mut ctrl.borrow_mut());
-    });
-    self
   }
 }
 
 impl StateBuilder for LogNavigationState {
   fn build(self) -> State {
-    let c1 = self.log_controller.clone();
+    let c1 = self.kit.log_controller.clone();
+    let c2 = c1.clone();
 
     self
+      .kit
       .action(KeyEvent::simple(KeyCode::Char('1')), |ctrl| {
         ctrl.style_mut().next()
       })
@@ -47,6 +38,9 @@ impl StateBuilder for LogNavigationState {
       })
       .action(KeyEvent::simple(KeyCode::Char('4')), |ctrl| {
         ctrl.style_mut().pid_style.next()
+      })
+      .action(KeyEvent::simple(KeyCode::Char('f')), |ctrl| {
+        ctrl.view_mut().ui_mut().want_follow()
       })
       .state
       .view_port(c1, true)

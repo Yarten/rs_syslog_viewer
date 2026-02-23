@@ -1,3 +1,4 @@
+use color_eyre::owo_colors::OwoColorize;
 use ratatui::{
   buffer::Buffer,
   layout::Rect,
@@ -11,9 +12,6 @@ enum Mode {
   /// 一般的提示信息
   Info,
 
-  /// 操作错误时的提示信息
-  Error,
-
   /// 输入模式
   Input,
 }
@@ -21,6 +19,7 @@ enum Mode {
 #[derive(Copy, Clone)]
 pub struct Theme {
   pub bg: Color,
+  pub prefix: Style,
   pub info: Style,
   pub error: Style,
   pub prompt: Style,
@@ -31,7 +30,8 @@ impl Default for Theme {
   fn default() -> Self {
     Self {
       bg: Color::White,
-      info: Style::new().green(),
+      prefix: Style::new().black().bold(),
+      info: Style::new().green().bold(),
       error: Style::new().red().bold(),
       prompt: Style::new().dark_gray().bold(),
       input: Style::new().black(),
@@ -46,6 +46,10 @@ pub struct StatusBar {
 
   /// 展示的信息。在 Input 模式下，它展示为前缀，还会自动后缀 ": "
   message: String,
+
+  /// 展示的错误信息。存在错误时，优先展示错误。但如果随后设置了 info 或者键入输入，
+  /// 错误将被清除。
+  error_message: String,
 
   /// 输入的内容
   input: String,
@@ -62,6 +66,7 @@ impl StatusBar {
     Self {
       mode: Mode::Info,
       message: String::new(),
+      error_message: String::new(),
       input: String::new(),
       input_index: 0,
       theme,
@@ -74,14 +79,14 @@ impl StatusBar {
   {
     self.mode = Mode::Info;
     self.message = message.into();
+    self.reset_error();
   }
 
   pub fn set_error<T>(&mut self, message: T)
   where
     T: Into<String>,
   {
-    self.mode = Mode::Error;
-    self.message = message.into();
+    self.error_message = message.into();
   }
 
   pub fn set_input<T>(&mut self, message: T)
@@ -91,11 +96,23 @@ impl StatusBar {
     self.mode = Mode::Input;
     self.message = message.into() + ": ";
     self.reset_input(String::new());
+    self.reset_error();
   }
 
   pub fn reset_input(&mut self, input: String) {
     self.input = input;
     self.input_index = self.input.chars().count();
+    self.reset_error();
+  }
+
+  /// 清空错误，返回是否真的有错误被清空
+  fn reset_error(&mut self) -> bool {
+    if !self.error_message.is_empty() {
+      self.error_message.clear();
+      true
+    } else {
+      false
+    }
   }
 }
 
@@ -109,12 +126,20 @@ impl StatusBar {
   }
 
   pub fn enter_char(&mut self, new_char: char) {
+    if self.reset_error() {
+      return;
+    }
+
     let index = self.byte_index();
     self.input.insert(index, new_char);
     self.move_cursor_right();
   }
 
   pub fn delete_char(&mut self) -> bool {
+    if self.reset_error() {
+      return false;
+    }
+
     let is_not_cursor_leftmost = self.input_index != 0;
     if is_not_cursor_leftmost {
       // Method "remove" is not used on the saved text for deleting the selected char.
@@ -153,11 +178,19 @@ impl StatusBar {
   }
 
   pub fn move_cursor_left(&mut self) {
+    if self.reset_error() {
+      return;
+    }
+
     let cursor_moved_left = self.input_index.saturating_sub(1);
     self.input_index = self.clamp_cursor(cursor_moved_left);
   }
 
   pub fn move_cursor_right(&mut self) {
+    if self.reset_error() {
+      return;
+    }
+
     let cursor_moved_right = self.input_index.saturating_add(1);
     self.input_index = self.clamp_cursor(cursor_moved_right);
   }
@@ -167,19 +200,28 @@ impl StatusBar {
   }
 }
 
+const INFO_PREFIX: &str = " # ";
+const ERROR_PREFIX: &str = " ! ";
+const INPUT_PREFIX: &str = " $ ";
+
 impl StatusBar {
   pub fn render(&self, area: Rect, buf: &mut Buffer) {
     let mut text = Text::default().bg(self.theme.bg);
-    match self.mode {
-      Mode::Info => {
-        text.push_span(Span::styled(&self.message, self.theme.info));
-      }
-      Mode::Error => {
-        text.push_span(Span::styled(&self.message, self.theme.error));
-      }
-      Mode::Input => {
-        text.push_span(Span::styled(&self.message, self.theme.prompt));
-        text.push_span(Span::styled(&self.input, self.theme.input));
+
+    if !self.error_message.is_empty() {
+      text.push_span(Span::styled(ERROR_PREFIX, self.theme.prefix));
+      text.push_span(Span::styled(&self.error_message, self.theme.error));
+    } else {
+      match self.mode {
+        Mode::Info => {
+          text.push_span(Span::styled(INFO_PREFIX, self.theme.prefix));
+          text.push_span(Span::styled(&self.message, self.theme.info));
+        }
+        Mode::Input => {
+          text.push_span(Span::styled(INPUT_PREFIX, self.theme.prefix));
+          text.push_span(Span::styled(&self.message, self.theme.prompt));
+          text.push_span(Span::styled(&self.input, self.theme.input));
+        }
       }
     }
 
@@ -188,7 +230,7 @@ impl StatusBar {
 
   pub fn get_cursor_position(&self) -> Option<usize> {
     if let Mode::Input = self.mode {
-      Some(self.message.chars().count() + self.input_index)
+      Some(self.message.chars().count() + self.input_index + INPUT_PREFIX.len())
     } else {
       None
     }
