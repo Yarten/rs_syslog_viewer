@@ -2,11 +2,11 @@ use crate::ui::Event;
 use crate::{
   app::{
     Controller, LogHub, StateBuilder,
-    controller::{DebugController, LogController, TagController},
+    controller::{AppController, DebugController, LogController, TagController},
     page::{DebugPage, LogPage, TagPage, log_page},
     state::{
       DebugOperationState, LogContentSearchedState, LogContentSearchingState, LogNavigationState,
-      TagOperationState,
+      QuitState, TagOperationState,
     },
   },
   debug,
@@ -85,10 +85,12 @@ struct StateMachineBuilder {
   debug_nav_state: State,
   log_content_searching_state: State,
   log_content_searched_state: State,
+  quit_state: State,
 }
 
 impl StateMachineBuilder {
   fn build(self) -> StateMachine {
+    const QUIT_STATE: usize = 0;
     const LOG_NAV_STATE: usize = 1;
     const TAG_NAV_STATE: usize = 2;
     const DEBUG_NAV_STATE: usize = 3;
@@ -130,7 +132,20 @@ impl StateMachineBuilder {
           .goto(
             KeyEvent::simple(KeyCode::Char('/')),
             LOG_CONTENT_SEARCHING_STATE,
-          ),
+          )
+          // 按 esc 关闭子页面，或者进入关闭程序的询问
+          .goto_action(KeyEvent::simple(KeyCode::Esc), QUIT_STATE, |pager| {
+            !pager.close_top()
+          }),
+      )
+      // -------------------------------------------------
+      // 询问是否要关闭的状态
+      .state(
+        QUIT_STATE,
+        self
+          .quit_state
+          .goto(KeyEvent::simple(KeyCode::Char('n')), LOG_NAV_STATE)
+          .goto(KeyEvent::simple(KeyCode::Esc), LOG_NAV_STATE),
       )
       // -------------------------------------------------
       // 标签导航状态
@@ -218,6 +233,7 @@ impl Viewer {
 
     // ------------------------------------------
     // 创造各个控制器
+    let app_controller = Rc::new(RefCell::new(AppController::default()));
     let log_controller = Rc::new(RefCell::new(LogController::default()));
     let tag_controller = Rc::new(RefCell::new(TagController::default()));
     let debug_controller = Rc::new(RefCell::new(DebugController::default()));
@@ -225,6 +241,7 @@ impl Viewer {
     // ------------------------------------------
     // 记录所有控制器
     let controllers: Vec<Rc<RefCell<dyn Controller>>> = vec![
+      app_controller.clone(),
       log_controller.clone(),
       tag_controller.clone(),
       debug_controller.clone(),
@@ -234,6 +251,7 @@ impl Viewer {
     // 构建状态机与状态
     let sm = StateMachineBuilder {
       sm_config: config.sm_config,
+      quit_state: QuitState::new(app_controller.clone()).build(),
       log_nav_state: LogNavigationState::new(log_controller.clone()).build(),
       tag_nav_state: TagOperationState::new(tag_controller.clone()).build(),
       debug_nav_state: DebugOperationState::new(debug_controller.clone()).build(),
