@@ -1,4 +1,5 @@
 use color_eyre::owo_colors::OwoColorize;
+use itertools::Itertools;
 use ratatui::{
   buffer::Buffer,
   layout::Rect,
@@ -6,6 +7,7 @@ use ratatui::{
   text::{Span, Text},
   widgets::Widget,
 };
+use std::borrow::Cow;
 
 /// 状态栏展示的模式
 enum Mode {
@@ -54,8 +56,11 @@ pub struct StatusBar {
   /// 输入的内容
   input: String,
 
-  /// 输入光标在 input 中的位置
+  /// 下一个要插入的字符的位置
   input_index: usize,
+
+  /// 光标的渲染位置（相对于可输入范围的相对位置）
+  cursor_index: usize,
 
   /// 本状态栏的主题
   theme: Theme,
@@ -69,6 +74,7 @@ impl StatusBar {
       error_message: String::new(),
       input: String::new(),
       input_index: 0,
+      cursor_index: 0,
       theme,
     }
   }
@@ -102,6 +108,7 @@ impl StatusBar {
   pub fn reset_input(&mut self, input: String) {
     self.input = input;
     self.input_index = self.input.chars().count();
+    self.cursor_index = self.input_index;
     self.reset_error();
   }
 
@@ -183,7 +190,11 @@ impl StatusBar {
     }
 
     let cursor_moved_left = self.input_index.saturating_sub(1);
+    let last_input_index = self.input_index;
     self.input_index = self.clamp_cursor(cursor_moved_left);
+    if last_input_index != self.input_index {
+      self.cursor_index = self.cursor_index.saturating_sub(1);
+    }
   }
 
   pub fn move_cursor_right(&mut self) {
@@ -192,7 +203,11 @@ impl StatusBar {
     }
 
     let cursor_moved_right = self.input_index.saturating_add(1);
+    let last_input_index = self.input_index;
     self.input_index = self.clamp_cursor(cursor_moved_right);
+    if last_input_index != self.input_index {
+      self.cursor_index += 1; // 在渲染时再被 clamp
+    }
   }
 
   fn clamp_cursor(&self, new_cursor_pos: usize) -> usize {
@@ -205,8 +220,10 @@ const ERROR_PREFIX: &str = " ! ";
 const INPUT_PREFIX: &str = " $ ";
 
 impl StatusBar {
-  pub fn render(&self, area: Rect, buf: &mut Buffer) {
+  /// 渲染状态栏，返回光标位置，由外层调用者渲染
+  pub fn render(&mut self, area: Rect, buf: &mut Buffer) -> Option<usize> {
     let mut text = Text::default().bg(self.theme.bg);
+    let mut cursor_position = None;
 
     if !self.error_message.is_empty() {
       text.push_span(Span::styled(ERROR_PREFIX, self.theme.prefix));
@@ -220,19 +237,98 @@ impl StatusBar {
         Mode::Input => {
           text.push_span(Span::styled(INPUT_PREFIX, self.theme.prefix));
           text.push_span(Span::styled(&self.message, self.theme.prompt));
-          text.push_span(Span::styled(&self.input, self.theme.input));
+
+          // 供输入内容展示的最大宽度，如果输入超过这个宽度，我们需要省略内容
+          let max_width = area.width as isize
+            - 1
+            - INPUT_PREFIX.len() as isize
+            - self.message.chars().count() as isize;
+
+          // 仅有一点宽度时，才渲染输入的内容与光标
+          if max_width > 0 {
+            let max_width = max_width as usize;
+
+            // 对于超出可视范围的数据进行缩略，更新光标渲染的位置
+            let (rendered_input, cursor_index) = self.omit_some_input_by_cursor(max_width);
+            cursor_position = Some(cursor_index);
+
+            // 对最终结果进行渲染
+            text.push_span(Span::styled(rendered_input, self.theme.input));
+          }
         }
       }
     }
 
     text.render(area, buf);
+
+    match cursor_position {
+      None => None,
+      Some(cursor_index) => {
+        self.cursor_index = cursor_index; // 因为 text 中引用了 self.input，因此只能在它渲染完毕后更新索引
+        Some(INPUT_PREFIX.len() + self.message.chars().count() + self.cursor_index)
+      }
+    }
   }
 
-  pub fn get_cursor_position(&self) -> Option<usize> {
-    if let Mode::Input = self.mode {
-      Some(self.message.chars().count() + self.input_index + INPUT_PREFIX.len())
+  /// 当输入框的宽度不够时，根据光标的位置，对内容进行选择性缩略
+  fn omit_some_input_by_cursor(&'_ self, max_width: usize) -> (Cow<'_, str>, usize) {
+    // 获取输入的字符数量
+    let curr_width = self.input.chars().count();
+
+    // 若输入内容可以容得下，则不做特殊处理
+    if curr_width <= max_width {
+      return (Cow::from(&self.input), self.input_index);
+    }
+
+    // 取出字符串数组，对完整的字符而非字节进行操作
+    let chars = self.input.chars().collect_vec();
+
+    // 确保光标的渲染位置不会超出可展示的区域
+    let cursor_index = self.cursor_index.min(max_width - 1);
+
+    // 如果宽度太短，则不展示表示缩略的 ..
+    // 此处 max_width 不会为零。
+    if max_width <= 6 {
+      return (
+        Cow::from(String::from_iter(
+          &chars[self.input_index - cursor_index
+            ..(self.input_index + max_width - cursor_index).min(chars.len())],
+        )),
+        cursor_index,
+      );
+    }
+
+    // 取出输入内容的所有字符，我们将取出部分字符，和 .. 组成新的字符串返回
+    let head_omit_pos = max_width - 2;
+    let tail_omit_pos = curr_width + 2 - max_width;
+
+    if self.input_index < head_omit_pos {
+      // 光标接近输入内容的开端，因此在末尾展示省略
+      (
+        Cow::from(String::from_iter(&chars[..head_omit_pos]) + ".."),
+        self.input_index,
+      )
+    } else if self.input_index >= tail_omit_pos {
+      // 光标接近输入内容的末端，因此在开头展示省略。
+      (
+        Cow::from(String::from("..") + &String::from_iter(&chars[tail_omit_pos..])),
+        // +2 代表 .. ，光标位置在其之右
+        self.input_index - tail_omit_pos + 2,
+      )
     } else {
-      None
+      // 确保光标不会落到两边 .. 的位置上
+      let cursor_index = cursor_index.clamp(2, max_width - 2 - 1);
+      (
+        Cow::from(
+          String::from("..")
+            + &String::from_iter(
+              &chars[self.input_index - cursor_index + 2
+                ..self.input_index + max_width - cursor_index - 2],
+            )
+            + "..",
+        ),
+        cursor_index,
+      )
     }
   }
 }

@@ -339,7 +339,7 @@ impl Pager {
 }
 
 impl Pager {
-  pub fn render(&self, frame: &mut Frame) {
+  pub fn render(&mut self, frame: &mut Frame) {
     // 将整个页面分为核心展示部分（展示一些 Page），以及底部的状态栏
     let vertical = Layout::vertical([Constraint::Fill(1), Constraint::Length(1)]);
     let [main, bottom] = frame.area().layout(&vertical);
@@ -348,10 +348,10 @@ impl Pager {
     self.render_main(main, frame.buffer_mut());
 
     // 渲染状态栏
-    self.status_bar.render(bottom, frame.buffer_mut());
+    let cursor_pos = self.status_bar.render(bottom, frame.buffer_mut());
 
     // 如果状态栏存在光标，则将其绘制出来
-    if let Some(cursor_pos) = self.status_bar.get_cursor_position() {
+    if let Some(cursor_pos) = cursor_pos {
       frame.set_cursor_position(Position::new(bottom.x + cursor_pos as u16, bottom.y));
     }
   }
