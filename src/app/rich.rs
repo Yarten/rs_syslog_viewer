@@ -1,14 +1,13 @@
 use lazy_static::lazy_static;
 use ratatui::{
   prelude::Modifier,
-  style::{Color, Style, Styled},
+  style::Style,
   text::{self, Span},
-  widgets::ListItem,
 };
 use regex::Regex;
 use std::borrow::Cow;
 use std::collections::HashMap;
-use std::ops::{Range, RangeFrom};
+use std::ops::Range;
 
 /// 在文本中查找所有匹配的子字符串区间（不考虑重叠）
 ///

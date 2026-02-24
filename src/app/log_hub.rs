@@ -222,8 +222,6 @@ where
   F: Fn(&LogLine, &LogLine) -> Ordering,
 {
   fn next_one(&mut self) -> Option<LogItem<'a>> {
-    // TODO: 1. Index 补充 selection；2. 初次遍历需要找到它；3. forward，backward iters 迭代方向相反
-
     let (index, min_elem) = match self.direction {
       LogDirection::Forward => Self::find_extremum(&self.cmp, self.iters.iter_mut().enumerate()),
       LogDirection::Backward => {

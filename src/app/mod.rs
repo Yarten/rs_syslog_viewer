@@ -4,6 +4,7 @@ pub mod page;
 mod rich;
 pub mod state;
 mod then;
+mod time_matcher;
 mod viewer;
 
 pub use controller::Controller;

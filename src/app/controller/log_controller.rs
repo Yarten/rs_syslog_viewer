@@ -299,6 +299,7 @@ impl LogController {
   }
 }
 
+// TODO: 抽象搜索函数，给定条件 con 进行通用搜索。实现更多搜索，如正则、反搜索
 impl LogController {
   /// 定位下一条被标记的日志
   fn locate_next_marked(&mut self, data: &mut LogHubRef, index: Index) -> Index {
