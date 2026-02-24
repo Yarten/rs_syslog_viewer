@@ -477,14 +477,13 @@ impl Controller for LogController {
     self.view_port.fill(data, cursor_index);
 
     // 如果存在数据顶到头，触发更老的日志加载
-    data.try_load_older_logs(
-      self
-        .view()
-        .data
-        .front()
-        .map(|(first_index, _)| first_index)
-        .unwrap_or(&data.first_index()),
-    );
+    let first_index = self
+      .view()
+      .data
+      .front()
+      .map(|(first_index, _)| first_index.clone())
+      .unwrap_or(data.first_index());
+    data.try_load_older_logs(&first_index);
   }
 
   fn view_port(&mut self) -> Option<&mut ViewPortBase> {

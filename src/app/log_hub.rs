@@ -1,4 +1,4 @@
-use crate::log::{Config, DataBoard, Index as LogIndex, LogLine, RotatedLog};
+use crate::log::{Config, DataBoard, Index as LogIndex, LogDirection, LogLine, RotatedLog};
 use std::path::PathBuf;
 use std::{
   cmp::Ordering,
@@ -15,7 +15,13 @@ use tokio_util::sync::CancellationToken;
 /// 所有日志文件的索引
 #[derive(Clone)]
 pub struct Index {
+  /// 各个文件此时标记的日志索引
   indexes: Vec<LogIndex>,
+
+  /// 当前选择的是具体哪一份文件的日志。
+  /// 同一组索引由于遍历方向的不同，会导致指向的数据不同，因此需要
+  /// 本字段进行精确地指示。
+  selection: usize,
 }
 
 /// 日志文件，支持内容的查找操作，以及标记操作，
@@ -193,8 +199,100 @@ where
   I: Iterator<Item = (LogIndex, &'a mut LogLine)>,
   F: Fn(&LogLine, &LogLine) -> Ordering,
 {
-  iters: Vec<(I, Option<(LogIndex, &'a mut LogLine)>)>,
+  /// 存储了：
+  /// 1. 最后一次有效结果的索引，使用出发时的索引进行初始化，迭代过程中逐渐更新；
+  /// 2. 迭代器；
+  /// 3. 上一次迭代器取出、但未被采纳的结果
+  iters: Vec<(LogIndex, I, Option<(LogIndex, &'a mut LogLine)>)>,
+
+  /// 比较两个日志，若返回 Less，表示左边日志优先取用
   cmp: F,
+
+  /// 遍历开始时的日志选择。第一次遍历，需要将迭代器一直跳转到指定选择上。
+  /// 若本字段数值大于 iters 的元素数量，则不处理。命中第一次后，它的值被设置为一个足够大的值。
+  init_selection: usize,
+
+  /// 遍历的方向，会影响遍历各个文件的顺序
+  direction: LogDirection,
+}
+
+impl<'a, I, F> Iter<'a, I, F>
+where
+  I: Iterator<Item = (LogIndex, &'a mut LogLine)>,
+  F: Fn(&LogLine, &LogLine) -> Ordering,
+{
+  fn next_one(&mut self) -> Option<LogItem<'a>> {
+    // TODO: 1. Index 补充 selection；2. 初次遍历需要找到它；3. forward，backward iters 迭代方向相反
+
+    let (index, min_elem) = match self.direction {
+      LogDirection::Forward => Self::find_extremum(&self.cmp, self.iters.iter_mut().enumerate()),
+      LogDirection::Backward => {
+        Self::find_extremum(&self.cmp, self.iters.iter_mut().enumerate().rev())
+      }
+    };
+
+    // 若找到了极值，则需要将其取到的数据记录清掉，以便于下一个周期取新的进行比较。
+    if let Some((nth, min_log)) = min_elem {
+      // 清理的同时，还需要记录最后一次有效的索引
+      let iter = &mut self.iters[nth];
+      if let Some((last_index, _)) = iter.2.take() {
+        iter.0 = last_index;
+      }
+
+      // 返回本次迭代的结果
+      Some((index, min_log))
+    } else {
+      None
+    }
+  }
+
+  /// 给定各个日志的迭代器的迭代器，寻找这一次迭代的极值
+  fn find_extremum<'b, J>(cmp: &F, iters: J) -> (Index, Option<(usize, &'a mut LogLine)>)
+  where
+    J: Iterator<
+        Item = (
+          usize,
+          &'b mut (LogIndex, I, Option<(LogIndex, &'a mut LogLine)>),
+        ),
+      > + ExactSizeIterator,
+    I: 'b,
+    'a: 'b,
+  {
+    // 所有日志的索引向量
+    let mut index = Index {
+      indexes: vec![LogIndex::zero(); iters.len()],
+      selection: usize::MAX,
+    };
+
+    // 记录极值元素
+    let mut min_elem: Option<(usize, &'a mut LogLine)> = None;
+
+    // 找到所有日志中的极值
+    for (nth, (last_index, i, elem)) in iters {
+      if elem.is_none() {
+        *elem = i.next();
+      }
+
+      if let Some((idx, log)) = elem {
+        index.indexes[nth] = *idx;
+
+        if match &min_elem {
+          None => true,
+          Some((_, min_log)) => (cmp)(log, min_log) == Ordering::Less,
+        } {
+          let log = crate::unsafe_ref!(LogLine, *log, mut);
+          min_elem = Some((nth, log));
+          index.selection = nth;
+        }
+      } else {
+        // 该日志的迭代器取不出内容时，使用上一次有效的索引来代表它的索引
+        index.indexes[nth] = *last_index;
+      }
+    }
+
+    // 返回结果
+    (index, min_elem)
+  }
 }
 
 impl<'a, I, F> Iterator for Iter<'a, I, F>
@@ -205,41 +303,19 @@ where
   type Item = LogItem<'a>;
 
   fn next(&mut self) -> Option<Self::Item> {
-    // 所有日志的索引向量
-    let mut index = Index {
-      indexes: Vec::with_capacity(self.iters.len()),
-    };
-
-    // 记录极值元素
-    let mut min_elem: Option<(usize, &'a mut LogLine)> = None;
-
-    // 找到所有日志中的极值
-    for (nth, (i, elem)) in self.iters.iter_mut().enumerate() {
-      if elem.is_none() {
-        *elem = i.next();
-      }
-
-      if let Some((idx, log)) = elem {
-        index.indexes.push(*idx);
-
-        if match &min_elem {
-          None => true,
-          Some((_, min_log)) => (self.cmp)(log, min_log) == Ordering::Less,
-        } {
-          let log = crate::unsafe_ref!(LogLine, *log, mut);
-          min_elem = Some((nth, log))
+    loop {
+      return match self.next_one() {
+        None => None,
+        Some(item) => {
+          if self.init_selection < self.iters.len() {
+            if item.0.selection != self.init_selection {
+              continue;
+            }
+            self.init_selection = self.iters.len();
+          }
+          Some(item)
         }
-      } else {
-        index.indexes.push(LogIndex::zero());
-      }
-    }
-
-    // 若找到了极值，则需要将其取到的数据记录清掉，以便于下一个周期取新的进行比较
-    if let Some((nth, min_log)) = min_elem {
-      self.iters[nth].1 = None;
-      Some((index, min_log))
-    } else {
-      None
+      };
     }
   }
 }
@@ -261,9 +337,11 @@ impl<'a> LogHubRef<'a> {
         .indexes
         .into_iter()
         .zip(self.logs.iter_mut())
-        .map(|(idx, log)| (log.filtered_iter_forward_from(tags_ref, idx), None))
+        .map(|(idx, log)| (idx, log.filtered_iter_forward_from(tags_ref, idx), None))
         .collect(),
       cmp: LogLine::is_older,
+      init_selection: index.selection,
+      direction: LogDirection::Forward,
     }
   }
 
@@ -276,20 +354,24 @@ impl<'a> LogHubRef<'a> {
         .indexes
         .into_iter()
         .zip(self.logs.iter_mut())
-        .map(|(idx, log)| (log.filtered_iter_backward_from(tags_ref, idx), None))
+        .map(|(idx, log)| (idx, log.filtered_iter_backward_from(tags_ref, idx), None))
         .collect(),
       cmp: LogLine::is_newer,
+      init_selection: index.selection,
+      direction: LogDirection::Backward,
     }
   }
 
   /// 获取从第一条日志开始正向遍历的迭代器
   pub fn iter_forward_from_head(&'_ mut self) -> impl Iterator<Item = LogItem<'_>> {
-    self.iter_forward_from(self.first_index())
+    let index = self.first_index();
+    self.iter_forward_from(index)
   }
 
   /// 获取从最后一条日志开始逆向遍历的迭代器
   pub fn iter_backward_from_tail(&'_ mut self) -> impl Iterator<Item = LogItem<'_>> {
-    self.iter_backward_from(self.last_index())
+    let index = self.last_index();
+    self.iter_backward_from(index)
   }
 
   /// 获取指定索引处的迭代器，同时返回（正向，逆向）两种
@@ -306,16 +388,30 @@ impl<'a> LogHubRef<'a> {
   }
 
   /// 获取指向首条日志的索引
-  pub fn first_index(&self) -> Index {
-    Index {
+  pub fn first_index(&mut self) -> Index {
+    let index = Index {
       indexes: self.logs.iter().map(|log| log.first_index()).collect(),
+      selection: usize::MAX,
+    };
+
+    // 只有迭代过一次后，才能正确地找到第一条日志的 selection
+    match self.iter_forward_from(index.clone()).next() {
+      None => index,
+      Some((index, _)) => index,
     }
   }
 
   /// 获取最新的日志索引（也即最后一个日志的索引）
-  pub fn last_index(&self) -> Index {
-    Index {
+  pub fn last_index(&mut self) -> Index {
+    let index = Index {
       indexes: self.logs.iter().map(|log| log.last_index()).collect(),
+      selection: usize::MAX,
+    };
+
+    // 只有迭代过一次后，才能正确地找到第一条日志的 selection
+    match self.iter_backward_from(index.clone()).next() {
+      None => index,
+      Some((index, _)) => index,
     }
   }
 
