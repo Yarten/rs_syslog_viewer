@@ -6,6 +6,7 @@ use crossterm::event::{KeyCode, KeyEvent};
 use std::{cell::RefCell, rc::Rc};
 
 mod debug_operation_state;
+mod help_state;
 mod log_content_searched_state;
 mod log_content_searching_state;
 mod log_navigation_state;
@@ -16,6 +17,7 @@ mod quit_state;
 mod tag_operation_state;
 
 pub use debug_operation_state::DebugOperationState;
+pub use help_state::HelpState;
 pub use log_content_searched_state::LogContentSearchedState;
 pub use log_content_searching_state::LogContentSearchingState;
 pub use log_navigation_state::LogNavigationState;

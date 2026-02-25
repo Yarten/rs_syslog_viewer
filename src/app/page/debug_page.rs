@@ -8,9 +8,8 @@ use ratatui::text::Line;
 use ratatui::{
   buffer::Buffer,
   layout::Rect,
-  style::{Color, Style, Styled, Stylize},
+  style::{Color, Stylize},
   text::{self, Span},
-  widgets::ListItem,
 };
 use std::{borrow::Cow, cell::RefCell, rc::Rc};
 
@@ -34,7 +33,7 @@ impl Page for DebugPage {
 
 impl DebugPage {
   fn render_item<'a>(&self, item: &'a Item) -> Line<'a> {
-    let mut line = text::Line::default();
+    let mut line = Line::default();
 
     line.push_span(
       format!(

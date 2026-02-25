@@ -2,11 +2,12 @@ use crate::ui::Event;
 use crate::{
   app::{
     Controller, LogHub, StateBuilder,
-    controller::{AppController, DebugController, LogController, TagController},
-    page::{DebugPage, LogPage, TagPage, log_page},
+    controller::{AppController, DebugController, HelpController, LogController, TagController},
+    page::{DebugPage, HelpPage, LogPage, TagPage, log_page},
     state::{
-      DebugOperationState, LogContentSearchedState, LogContentSearchingState, LogNavigationState,
-      LogTimestampSearchedState, LogTimestampSearchingState, QuitState, TagOperationState,
+      DebugOperationState, HelpState, LogContentSearchedState, LogContentSearchingState,
+      LogNavigationState, LogTimestampSearchedState, LogTimestampSearchingState, QuitState,
+      TagOperationState,
     },
   },
   debug,
@@ -76,6 +77,7 @@ pub struct Viewer {
 
 const TAG_PAGE: usize = 1;
 const DEBUG_PAGE: usize = 2;
+const HELP_PAGE: usize = 3;
 
 /// 辅助构建状态机的类
 struct StateMachineBuilder {
@@ -88,6 +90,7 @@ struct StateMachineBuilder {
   log_content_searched_state: State,
   log_timestamp_searching_state: State,
   log_timestamp_searched_state: State,
+  help_state: State,
 }
 
 impl StateMachineBuilder {
@@ -100,6 +103,7 @@ impl StateMachineBuilder {
     const LOG_CONTENT_SEARCHED_STATE: usize = 5;
     const LOG_TIMESTAMP_SEARCHING_STATE: usize = 6;
     const LOG_TIMESTAMP_SEARCHED_STATE: usize = 7;
+    const HELP_STATE: usize = 8;
 
     StateMachine::new(self.sm_config)
       // -------------------------------------------------
@@ -146,7 +150,9 @@ impl StateMachineBuilder {
           .goto_action(KeyEvent::simple(KeyCode::Esc), QUIT_STATE, |pager| {
             !pager.close_top()
           })
-          .goto(KeyEvent::simple(KeyCode::Char('q')), QUIT_STATE),
+          .goto(KeyEvent::simple(KeyCode::Char('q')), QUIT_STATE)
+          // 按 h 打开帮助页面
+          .goto(KeyEvent::simple(KeyCode::Char('h')), HELP_STATE),
       )
       // -------------------------------------------------
       // 询问是否要关闭的状态
@@ -174,10 +180,13 @@ impl StateMachineBuilder {
           .debug_nav_state
           .enter_action(|pager| {
             pager.focus(DEBUG_PAGE);
-            pager.status().set_tips("press 'd' or esc to unfocus");
+            pager
+              .status()
+              .set_tips("press 'd' or 'esc' or 'q' to unfocus");
           })
           .goto(KeyEvent::simple(KeyCode::Esc), LOG_NAV_STATE)
-          .goto(KeyEvent::simple(KeyCode::Char('d')), LOG_NAV_STATE),
+          .goto(KeyEvent::simple(KeyCode::Char('d')), LOG_NAV_STATE)
+          .goto(KeyEvent::simple(KeyCode::Char('q')), LOG_NAV_STATE),
       )
       // -------------------------------------------------
       // 日志内容搜索输入状态
@@ -189,9 +198,17 @@ impl StateMachineBuilder {
           .goto_action(
             KeyEvent::simple(KeyCode::Enter),
             LOG_CONTENT_SEARCHED_STATE,
-            |pager| match pager.status().get_input() {
-              None => false,
-              Some(input) => !input.is_empty(),
+            |pager| {
+              let ok = match pager.status().get_input() {
+                None => false,
+                Some(input) => !input.is_empty(),
+              };
+              if !ok {
+                pager.status().set_tips(
+                  "Search content is empty ! (type char to continue, or press esc to quit)",
+                );
+              }
+              ok
             },
           ),
       )
@@ -222,6 +239,20 @@ impl StateMachineBuilder {
         self
           .log_timestamp_searched_state
           .goto(KeyEvent::simple(KeyCode::Esc), LOG_NAV_STATE),
+      )
+      // -------------------------------------------------
+      // 渲染帮助页面
+      .state(
+        HELP_STATE,
+        self
+          .help_state
+          .goto(KeyEvent::simple(KeyCode::Esc), LOG_NAV_STATE)
+          .goto(KeyEvent::simple(KeyCode::Char('h')), LOG_NAV_STATE)
+          .goto(KeyEvent::simple(KeyCode::Char('q')), LOG_NAV_STATE)
+          .enter_action(|pager| pager.open_full(HELP_PAGE))
+          .leave_action(|pager| {
+            pager.close(HELP_PAGE);
+          }),
       )
   }
 }
@@ -267,6 +298,7 @@ impl Viewer {
     let log_controller = Rc::new(RefCell::new(LogController::default()));
     let tag_controller = Rc::new(RefCell::new(TagController::default()));
     let debug_controller = Rc::new(RefCell::new(DebugController::default()));
+    let help_controller = Rc::new(RefCell::new(HelpController::default()));
 
     // ------------------------------------------
     // 记录所有控制器
@@ -275,6 +307,7 @@ impl Viewer {
       log_controller.clone(),
       tag_controller.clone(),
       debug_controller.clone(),
+      help_controller.clone(),
     ];
 
     // ------------------------------------------
@@ -290,6 +323,7 @@ impl Viewer {
       log_timestamp_searching_state: LogTimestampSearchingState::new(log_controller.clone())
         .build(),
       log_timestamp_searched_state: LogTimestampSearchedState::new(log_controller.clone()).build(),
+      help_state: HelpState::new(help_controller.clone()).build(),
     }
     .build();
 
@@ -301,7 +335,8 @@ impl Viewer {
         config: config.log_page_config,
       })
       .add_page(TAG_PAGE, TagPage { tag_controller })
-      .add_page(DEBUG_PAGE, DebugPage { debug_controller });
+      .add_page(DEBUG_PAGE, DebugPage { debug_controller })
+      .add_page(HELP_PAGE, HelpPage { help_controller });
 
     // ------------------------------------------
     // 构造并返回本类对象
