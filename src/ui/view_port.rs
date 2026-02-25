@@ -211,13 +211,16 @@ pub trait ViewPortRenderEx: ViewPortEx {
     // 组装渲染条目
     let mut items: Vec<Line> = self.data().iter().map(|i| f(i)).collect();
 
+    // 找到最大宽度（预留一些，使之能看出来行的结束位置，而不是看起来被截断一样）
+    let max_items_width = items.iter().map(|line| line.width()).max().unwrap_or(0) + 10;
+
     // -----------------------------------------------------------
     // 调整并渲染横向滚动条的位置。该滚动条不一定想要渲染，取决于 UI 数据中是否记录了它先前的位置。
     let mut horizontal_scroll_position = self.ui().horizontal_scroll_position;
 
     if let Some(pos) = horizontal_scroll_position.as_mut() {
       // 计算当前行最大宽度
-      let width = items.iter().map(|line| line.width()).max().unwrap_or(0) + 10;
+      let width = max_items_width;
 
       // 可滚动的范围
       let area_width = area.width as usize;
@@ -286,11 +289,12 @@ pub trait ViewPortRenderEx: ViewPortEx {
       // 若本行的宽度小于可视区的宽度，我们需要在其后方补充空白格，否则高亮区域没法横穿整个行，看起来会比较奇怪。
       // 本来用 List 渲染可以自动解决这个问题，但它不支持 scrollbar ，因此我们只能手动实现下。
       let line_width = line.width();
-      if line_width < area.width as usize {
-        line.push_span(Span::raw(" ".repeat(area.width as usize - line_width)));
+      let width = max_items_width.max(area.width as usize);
+      if line_width < width {
+        line.push_span(Span::raw(" ".repeat(width - line_width)));
       }
 
-      line.style = line.style.bg(Color::Blue);
+      line.style = line.style.bg(Color::White);
     }
 
     // -----------------------------------------------------------
