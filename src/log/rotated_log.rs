@@ -364,6 +364,9 @@ where
   /// 3. 在遍历中间，跳转到匹配、但链接无效的日志行，虽然更新了记录，但是是已知无效的。
   /// 在遇到下一个有效日志行、或者遍历结束时，会从 index
   chain_begin_is_known_as_invalid: bool,
+
+  /// 确保迭代器走到尽头后，不再进入处理循环，而是直接结束
+  end_is_reached: bool,
 }
 
 /// 用于特化取出指定索引开始遍历的迭代器（可能是正向，也可能是逆向）
@@ -413,6 +416,7 @@ where
       index,
       link: LogLink::default(),
       chain_begin_is_known_as_invalid: false,
+      end_is_reached: false,
     }
   }
 
@@ -492,6 +496,10 @@ where
   type Item = ItemMut<'a>;
 
   fn next(&mut self) -> Option<Self::Item> {
+    if self.end_is_reached {
+      return None;
+    }
+
     // 循环处理过程中，因为始终找不到匹配的日志行，且 link 一直过期，
     // 而不断累积的无效日志行跳过步长，
     // 我们从本次迭代开始的 index 一直统计到遇到匹配的日志行、或者有效的 link 为止
@@ -517,7 +525,8 @@ where
       // 如果已经取不到数据，说明已经访问到末尾，我们需要刷新此前所有无效日志行，
       // 让它们的 link 指向一个越界的值，保证下次迭代可以快速结束。
       if curr_item.is_none() {
-        self.fix_links_all_the_way(None, skip_sum); // 注意，如果此时 iter 再次被误用，可能会导致链接错误
+        self.fix_links_all_the_way(None, skip_sum);
+        self.end_is_reached = true;
         return None;
       }
 
