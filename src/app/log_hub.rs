@@ -13,7 +13,7 @@ use tokio::{
 use tokio_util::sync::CancellationToken;
 
 /// 所有日志文件的索引
-#[derive(Clone)]
+#[derive(Clone, Default)]
 pub struct Index {
   /// 各个文件此时标记的日志索引
   indexes: Vec<LogIndex>,

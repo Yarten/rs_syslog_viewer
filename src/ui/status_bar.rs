@@ -1,4 +1,3 @@
-use color_eyre::owo_colors::OwoColorize;
 use itertools::Itertools;
 use ratatui::{
   buffer::Buffer,
@@ -12,7 +11,7 @@ use std::borrow::Cow;
 /// 状态栏展示的模式
 enum Mode {
   /// 一般的提示信息
-  Info,
+  Tips,
 
   /// 输入模式
   Input,
@@ -51,7 +50,7 @@ pub struct StatusBar {
 
   /// 展示的错误信息。存在错误时，优先展示错误。但如果随后设置了 info 或者键入输入，
   /// 错误将被清除。
-  error_message: String,
+  critical_message: String,
 
   /// 输入的内容
   input: String,
@@ -69,9 +68,9 @@ pub struct StatusBar {
 impl StatusBar {
   pub fn new(theme: Theme) -> Self {
     Self {
-      mode: Mode::Info,
+      mode: Mode::Tips,
       message: String::new(),
-      error_message: String::new(),
+      critical_message: String::new(),
       input: String::new(),
       input_index: 0,
       cursor_index: 0,
@@ -79,20 +78,20 @@ impl StatusBar {
     }
   }
 
-  pub fn set_info<T>(&mut self, message: T)
+  pub fn set_tips<T>(&mut self, message: T)
   where
     T: Into<String>,
   {
-    self.mode = Mode::Info;
+    self.mode = Mode::Tips;
     self.message = message.into();
     self.reset_error();
   }
 
-  pub fn set_error<T>(&mut self, message: T)
+  pub fn set_critical<T>(&mut self, message: T)
   where
     T: Into<String>,
   {
-    self.error_message = message.into();
+    self.critical_message = message.into();
   }
 
   pub fn set_input<T>(&mut self, message: T)
@@ -114,8 +113,8 @@ impl StatusBar {
 
   /// 清空错误，返回是否真的有错误被清空
   pub fn reset_error(&mut self) -> bool {
-    if !self.error_message.is_empty() {
-      self.error_message.clear();
+    if !self.critical_message.is_empty() {
+      self.critical_message.clear();
       true
     } else {
       false
@@ -225,12 +224,12 @@ impl StatusBar {
     let mut text = Text::default().bg(self.theme.bg);
     let mut cursor_position = None;
 
-    if !self.error_message.is_empty() {
+    if !self.critical_message.is_empty() {
       text.push_span(Span::styled(ERROR_PREFIX, self.theme.prefix));
-      text.push_span(Span::styled(&self.error_message, self.theme.error));
+      text.push_span(Span::styled(&self.critical_message, self.theme.error));
     } else {
       match self.mode {
-        Mode::Info => {
+        Mode::Tips => {
           text.push_span(Span::styled(INFO_PREFIX, self.theme.prefix));
           text.push_span(Span::styled(&self.message, self.theme.info));
         }

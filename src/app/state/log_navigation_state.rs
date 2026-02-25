@@ -52,16 +52,15 @@ impl StateBuilder for LogNavigationState {
       .action(KeyEvent::simple(KeyCode::Char(']')), |ctrl| {
         ctrl.next_mark()
       })
-      .errors(&[
-        (
-          Error::NextMarkedNotFound,
-          "No next marked log is found. (use [ to find previous one)",
-        ),
-        (
-          Error::PrevMarkedNotFound,
-          "No previous marked log is found. (use ] to find next one)",
-        ),
-      ])
+      .error(|e| match e {
+        Error::NextMarkedNotFound => {
+          Some("No next marked log is found. (use [ to find previous one)".to_string())
+        }
+        Error::PrevMarkedNotFound => {
+          Some("No previous marked log is found. (use ] to find next one)".to_string())
+        }
+        _ => None,
+      })
       .state
       .view_port(c1, true)
   }

@@ -190,11 +190,19 @@ impl TimeMatcher {
   /// 6. 模糊匹配规则：仅使用字符串里精度最小的单位进行时间对比，精度更小的单位则不参与比较。
   pub fn parse(&mut self, cmd: &str) -> Result<(), String> {
     // 使用逗号，分割多个部分，并 trim 每个部分的空格
-    cmd
-      .split(',')
-      .map(|s| s.trim())
-      .filter(|s| !s.is_empty())
-      .try_for_each(|con| self.parse_con(con))
+    let mut cons = cmd.split(',').map(|s| s.trim()).filter(|s| !s.is_empty());
+
+    let mut count = 0;
+    cons.try_for_each(|con| {
+      count += 1;
+      self.parse_con(con)
+    })?;
+
+    if count == 0 {
+      Err("Wrong format: empty conditions".to_string())
+    } else {
+      Ok(())
+    }
   }
 
   /// 解析其中一个条件
@@ -425,6 +433,7 @@ mod tests {
     tm.parse("2025-10.11").err().expect("should not parse");
     tm.parse("2025-10").err().expect("should not parse");
     tm.parse("1.2 ~ 1.3 ~ 1.4").err().expect("should not parse");
+    tm.parse("   ").err().expect("should not parse");
 
     tm.parse("< 1d, > 23h5s   , 1d 3s  , = 1s , 1.30 ~ 11:22 , > 11:22:33 2025.09.10")
       .expect("should parse");

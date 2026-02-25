@@ -11,4 +11,5 @@ pub use controller::Controller;
 pub use log_hub::{Index, LogHub, LogHubRef, LogItem};
 pub use rich::rich;
 pub use state::{StateBuilder, ViewPortStateEx};
+pub use time_matcher::TimeMatcher;
 pub use viewer::{Config, Viewer};

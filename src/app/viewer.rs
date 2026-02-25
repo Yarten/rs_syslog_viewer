@@ -6,7 +6,7 @@ use crate::{
     page::{DebugPage, LogPage, TagPage, log_page},
     state::{
       DebugOperationState, LogContentSearchedState, LogContentSearchingState, LogNavigationState,
-      QuitState, TagOperationState,
+      LogTimestampSearchedState, LogTimestampSearchingState, QuitState, TagOperationState,
     },
   },
   debug,
@@ -80,12 +80,14 @@ const DEBUG_PAGE: usize = 2;
 /// 辅助构建状态机的类
 struct StateMachineBuilder {
   sm_config: SmConfig,
+  quit_state: State,
   log_nav_state: State,
   tag_nav_state: State,
   debug_nav_state: State,
   log_content_searching_state: State,
   log_content_searched_state: State,
-  quit_state: State,
+  log_timestamp_searching_state: State,
+  log_timestamp_searched_state: State,
 }
 
 impl StateMachineBuilder {
@@ -96,6 +98,8 @@ impl StateMachineBuilder {
     const DEBUG_NAV_STATE: usize = 3;
     const LOG_CONTENT_SEARCHING_STATE: usize = 4;
     const LOG_CONTENT_SEARCHED_STATE: usize = 5;
+    const LOG_TIMESTAMP_SEARCHING_STATE: usize = 6;
+    const LOG_TIMESTAMP_SEARCHED_STATE: usize = 7;
 
     StateMachine::new(self.sm_config)
       // -------------------------------------------------
@@ -106,7 +110,7 @@ impl StateMachineBuilder {
           .log_nav_state
           .enter_action(|pager| {
             pager.focus_root();
-            pager.status().set_info("press 'h' for help");
+            pager.status().set_tips("press 'h' for help");
           })
           // 按 t 或 ctrl+t 聚焦与开关标签过滤页面
           .goto_action(
@@ -133,10 +137,16 @@ impl StateMachineBuilder {
             KeyEvent::simple(KeyCode::Char('/')),
             LOG_CONTENT_SEARCHING_STATE,
           )
+          // 按 ? 进入时间戳搜索状态
+          .goto(
+            KeyEvent::simple(KeyCode::Char('?')),
+            LOG_TIMESTAMP_SEARCHING_STATE,
+          )
           // 按 esc 关闭子页面，或者进入关闭程序的询问
           .goto_action(KeyEvent::simple(KeyCode::Esc), QUIT_STATE, |pager| {
             !pager.close_top()
-          }),
+          })
+          .goto(KeyEvent::simple(KeyCode::Char('q')), QUIT_STATE),
       )
       // -------------------------------------------------
       // 询问是否要关闭的状态
@@ -164,7 +174,7 @@ impl StateMachineBuilder {
           .debug_nav_state
           .enter_action(|pager| {
             pager.focus(DEBUG_PAGE);
-            pager.status().set_info("press 'd' or esc to unfocus");
+            pager.status().set_tips("press 'd' or esc to unfocus");
           })
           .goto(KeyEvent::simple(KeyCode::Esc), LOG_NAV_STATE)
           .goto(KeyEvent::simple(KeyCode::Char('d')), LOG_NAV_STATE),
@@ -191,6 +201,26 @@ impl StateMachineBuilder {
         LOG_CONTENT_SEARCHED_STATE,
         self
           .log_content_searched_state
+          .goto(KeyEvent::simple(KeyCode::Esc), LOG_NAV_STATE),
+      )
+      // -------------------------------------------------
+      // 日志时间戳搜索的输入状态
+      .state(
+        LOG_TIMESTAMP_SEARCHING_STATE,
+        self
+          .log_timestamp_searching_state
+          .goto(KeyEvent::simple(KeyCode::Esc), LOG_NAV_STATE)
+          .goto(
+            KeyEvent::simple(KeyCode::Enter),
+            LOG_TIMESTAMP_SEARCHED_STATE,
+          ),
+      )
+      // -------------------------------------------------
+      // 基于时间戳搜索与导航的状态
+      .state(
+        LOG_TIMESTAMP_SEARCHED_STATE,
+        self
+          .log_timestamp_searched_state
           .goto(KeyEvent::simple(KeyCode::Esc), LOG_NAV_STATE),
       )
   }
@@ -257,6 +287,9 @@ impl Viewer {
       debug_nav_state: DebugOperationState::new(debug_controller.clone()).build(),
       log_content_searching_state: LogContentSearchingState::new(log_controller.clone()).build(),
       log_content_searched_state: LogContentSearchedState::new(log_controller.clone()).build(),
+      log_timestamp_searching_state: LogTimestampSearchingState::new(log_controller.clone())
+        .build(),
+      log_timestamp_searched_state: LogTimestampSearchedState::new(log_controller.clone()).build(),
     }
     .build();
 

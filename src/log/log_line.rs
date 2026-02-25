@@ -1,6 +1,7 @@
 //! 描述一条、也即一行的系统日志，并维护相关操作状态
 
 use crate::log::LogLine::{Bad, Good};
+use aho_corasick::{AhoCorasick, MatchKind};
 use chrono::{DateTime, Datelike, FixedOffset, Local, NaiveDateTime};
 use lazy_static::lazy_static;
 use std::cmp::Ordering;
@@ -10,8 +11,6 @@ use std::cmp::Ordering;
 pub enum Label {
   #[default]
   Unknown,
-  Debug,
-  Info,
   Warn,
   Error,
 }
@@ -105,6 +104,21 @@ impl NowDate {
 
 lazy_static! {
   static ref NOW_DATE: NowDate = NowDate::new();
+}
+
+/// 关键字匹配器
+fn make_keywords_matcher(keywords: &[&str]) -> AhoCorasick {
+  AhoCorasick::builder()
+    .match_kind(MatchKind::LeftmostFirst)
+    .ascii_case_insensitive(true)
+    .build(keywords)
+    .unwrap()
+}
+
+lazy_static! {
+  static ref ERROR_KEYWORDS_MATCHER: AhoCorasick =
+    make_keywords_matcher(&["error", "fatal", "fail"]);
+  static ref WRAN_KEYWORDS_MATCHER: AhoCorasick = make_keywords_matcher(&["warn"]);
 }
 
 /// 日志行
@@ -213,12 +227,22 @@ impl LogLine {
 
     let tag = String::from_utf8_lossy(&tag).to_string();
 
+    // 匹配消息中是否有关键字，并按重要程度的优先级，进行设置
+    let label = if ERROR_KEYWORDS_MATCHER.is_match(&message) {
+      Label::Error
+    } else if WRAN_KEYWORDS_MATCHER.is_match(&message) {
+      Label::Warn
+    } else {
+      Label::Unknown
+    };
+
     // 返回结果
     Some(NormalLogLine {
       timestamp,
       tag,
       pid,
       message,
+      label,
       ..Default::default()
     })
   }
@@ -293,6 +317,14 @@ impl LogLine {
       (Good(_), Bad(_)) => Ordering::Greater,
       (Bad(_), Good(_)) => Ordering::Less,
       (Bad(_), Bad(_)) => Ordering::Less,
+    }
+  }
+
+  /// 获取日志中的时间戳
+  pub fn get_timestamp(&self) -> Option<DateTime<FixedOffset>> {
+    match self {
+      Good(log) => Some(log.timestamp),
+      Bad(_) => None,
     }
   }
 

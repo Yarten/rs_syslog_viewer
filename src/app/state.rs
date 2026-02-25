@@ -10,6 +10,8 @@ mod log_content_searched_state;
 mod log_content_searching_state;
 mod log_navigation_state;
 mod log_state_kit;
+mod log_timestamp_searched_state;
+mod log_timestamp_searching_state;
 mod quit_state;
 mod tag_operation_state;
 
@@ -17,6 +19,8 @@ pub use debug_operation_state::DebugOperationState;
 pub use log_content_searched_state::LogContentSearchedState;
 pub use log_content_searching_state::LogContentSearchingState;
 pub use log_navigation_state::LogNavigationState;
+pub use log_timestamp_searched_state::LogTimestampSearchedState;
+pub use log_timestamp_searching_state::LogTimestampSearchingState;
 pub use quit_state::QuitState;
 pub use tag_operation_state::TagOperationState;
 

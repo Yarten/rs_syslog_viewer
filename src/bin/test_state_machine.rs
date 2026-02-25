@@ -15,7 +15,7 @@ fn run(terminal: &mut DefaultTerminal) -> Result<()> {
 
   let idle_state = State::new("idle")
     .action(KeyEvent::ctrl('f'), |pager| {
-      pager.status().set_error("F is active")
+      pager.status().set_critical("F is active")
     })
     .action(KeyEvent::ctrl('a'), |pager| pager.toggle_left(1))
     .action(KeyEvent::ctrl('s'), |pager| pager.toggle_right(2))
@@ -29,18 +29,18 @@ fn run(terminal: &mut DefaultTerminal) -> Result<()> {
     .input("Input", |_| {})
     .goto_action(KeyEvent::simple(KeyCode::Enter), IDLE_STATE, |pager| {
       let input = pager.status().get_input().unwrap().clone();
-      pager.status().set_info(input);
+      pager.status().set_tips(input);
       true
     })
     .goto_action(KeyEvent::simple(KeyCode::Esc), IDLE_STATE, |pager| {
-      pager.status().set_error("Nothing !");
+      pager.status().set_critical("Nothing !");
       true
     });
 
   let quit_state = State::new("quit")
-    .enter_action(|pager| pager.status().set_info("Quit or not ? Y/n"))
+    .enter_action(|pager| pager.status().set_tips("Quit or not ? Y/n"))
     .goto_action(KeyEvent::simple(KeyCode::Char('n')), IDLE_STATE, |pager| {
-      pager.status().set_info("give up quit");
+      pager.status().set_tips("give up quit");
       true
     })
     .action(KeyEvent::simple(KeyCode::Char('y')), move |_| {

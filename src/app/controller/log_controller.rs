@@ -1,12 +1,19 @@
 use crate::{
-  app::{Controller, Index, LogHubRef, LogItem},
+  app::{Controller, Index, LogHubRef, LogItem, TimeMatcher},
   log::{LogDirection, LogLine},
   ui::CursorExpectation,
 };
+use chrono::{DateTime, FixedOffset};
 use std::{path::PathBuf, sync::Arc};
 
+/// 描述一条日志的其他属性，表征 viewer 其他渲染需求
+#[derive(Default)]
+pub struct Properties {
+  pub timestamp_matched: bool,
+}
+
 /// 展示区里维护的数据条目
-type Item = (Index, LogLine);
+type Item = (Index, LogLine, Properties);
 
 // 定义日志展示区的可视化数据
 crate::view_port!(ViewPort, Item);
@@ -20,9 +27,13 @@ impl ViewPort {
 
     // 使用 view port ui 的能力，逐一填充数据
     self.do_fill(|dir| match dir {
-      LogDirection::Forward => iter_down.next().map(|(index, log)| (index, log.clone())),
-      LogDirection::Backward => iter_up.next().map(|(index, log)| (index, log.clone())),
+      LogDirection::Forward => iter_down.next().map(Self::map_into_item),
+      LogDirection::Backward => iter_up.next().map(Self::map_into_item),
     })
+  }
+
+  fn map_into_item(item: (Index, &mut LogLine)) -> Item {
+    (item.0, item.1.clone(), Properties::default())
   }
 }
 
@@ -182,10 +193,19 @@ enum Control {
 
   /// 上一条符合搜索结果的日志
   PrevContentSearch,
+
+  /// 定位最近的符合搜索结果的日志
+  LocateTimestampSearch,
+
+  /// 下一条符合搜索结果的日志
+  NextTimestampSearch,
+
+  /// 上一条符合搜索结果的日志
+  PrevTimestampSearch,
 }
 
 /// 控制器的报错信息
-#[derive(Copy, Clone, Eq, PartialEq, Ord, PartialOrd)]
+#[derive(Clone, Eq, PartialEq, Ord, PartialOrd)]
 pub enum Error {
   // 跳转标记时的相关错误
   NextMarkedNotFound,
@@ -194,6 +214,11 @@ pub enum Error {
   // 内容搜索相关错误
   NextContentSearchNotFound,
   PrevContentSearchNotFound,
+
+  // 时间戳搜索相关错误
+  NextTimestampSearchNotFound,
+  PrevTimestampSearchNotFound,
+  TimestampSearchFormatError(String),
 }
 
 /// 日志展示区的控制器
@@ -215,6 +240,13 @@ pub struct LogController {
 
   /// 搜索的内容。为 None 时，说明当前不处于搜索状态。
   content_search: Option<String>,
+
+  /// 搜索时间戳的指令，本字段仅记录
+  timestamp_search: String,
+
+  /// 时间戳匹配器，仅进入搜索状态时有值。如果给定的搜索指令错误，会记录它
+  /// 生成时的错误信息
+  timestamp_matcher: Option<Result<TimeMatcher, String>>,
 }
 
 impl Default for LogController {
@@ -226,6 +258,8 @@ impl Default for LogController {
       control: Control::Idle,
       error: None,
       content_search: None,
+      timestamp_search: String::new(),
+      timestamp_matcher: None,
     };
 
     // 默认跟踪最新日志
@@ -297,98 +331,150 @@ impl LogController {
     static EMPTY: String = String::new();
     self.content_search.as_ref().unwrap_or(&EMPTY)
   }
+
+  /// 设置搜索的时间戳条件，或者设置不搜索
+  pub fn set_search_timestamp(&mut self, search: Option<String>) {
+    match search {
+      None => {
+        self.timestamp_matcher = None;
+      }
+      Some(cmd) => {
+        self.timestamp_search = cmd;
+      }
+    }
+  }
+
+  /// 搜索时间戳最近匹配的日志
+  pub fn search_timestamp(&mut self) {
+    self.control = Control::LocateTimestampSearch;
+
+    // 创建匹配器，解析搜索指令，如果出错，记录成错误
+    let mut tm = TimeMatcher::new();
+    match tm.parse(&self.timestamp_search) {
+      Ok(_) => {
+        self.timestamp_matcher = Some(Ok(tm));
+      }
+      Err(msg) => {
+        self.timestamp_matcher = Some(Err(msg));
+      }
+    }
+  }
+
+  /// 跳转到下一条时间戳匹配的日志
+  pub fn next_timestamp_search(&mut self) {
+    self.control = Control::NextTimestampSearch;
+  }
+
+  /// 跳转到上一条时间戳匹配的日志
+  pub fn prev_timestamp_search(&mut self) {
+    self.control = Control::PrevTimestampSearch;
+  }
+
+  /// 获取时间戳条件
+  pub fn get_search_timestamp(&self) -> &str {
+    &self.timestamp_search
+  }
 }
 
-// TODO: 抽象搜索函数，给定条件 con 进行通用搜索。实现更多搜索，如正则、反搜索
-impl LogController {
-  /// 定位下一条被标记的日志
-  fn locate_next_marked(&mut self, data: &mut LogHubRef, index: Index) -> Index {
-    let mut iter_down = data.iter_forward_from(index.clone());
-    iter_down.next();
-    match self.find_first_marked(iter_down) {
-      None => {
-        self.error = Some(Error::NextMarkedNotFound);
-        index
-      }
-      Some(index) => index,
+/// 辅助进行日志条件搜索
+struct Searcher<'a, 'b> {
+  data: &'a mut LogHubRef<'b>,
+  index: Index,
+  error: Option<Error>,
+}
+
+impl<'a, 'b> Searcher<'a, 'b> {
+  fn new(data: &'a mut LogHubRef<'b>, index: Index) -> Self {
+    Self {
+      data,
+      index,
+      error: None,
     }
   }
 
-  /// 定位上一条被标记的日志
-  fn locate_prev_marked(&mut self, data: &mut LogHubRef, index: Index) -> Index {
-    let mut iter_up = data.iter_backward_from(index.clone());
-    iter_up.next();
-    match self.find_first_marked(iter_up) {
-      None => {
-        self.error = Some(Error::PrevMarkedNotFound);
-        index
-      }
-      Some(index) => index,
-    }
-  }
-
-  /// 给定迭代器，往后遍历，寻找第一条被标记的内容
-  fn find_first_marked<'a>(&self, iter: impl Iterator<Item = LogItem<'a>>) -> Option<Index> {
-    for (index, log) in iter {
-      if log.is_marked() {
-        return Some(index);
-      }
-    }
-
-    None
-  }
-
-  /// 定位最近一条搜索内容匹配的日志
-  fn locate_nearest_content_search(&mut self, data: &mut LogHubRef, index: Index) -> Index {
-    let (iter_down, mut iter_up) = data.iter_at(index.clone());
+  fn nearest<F>(&mut self, matcher: F) -> Index
+  where
+    F: Fn(&LogLine) -> bool,
+  {
+    let index = std::mem::take(&mut self.index);
+    let (iter_down, mut iter_up) = self.data.iter_at(index.clone());
     iter_up.next();
 
-    self
-      .find_first_content_matched(iter_down)
-      .or(self.find_first_content_matched(iter_up))
+    Self::search_first_matched(iter_down, &matcher)
+      .or(Self::search_first_matched(iter_up, &matcher))
       .unwrap_or_else(|| index)
   }
 
-  /// 定位到下一条搜索内容匹配的日志
-  fn locate_next_content_search(&mut self, data: &mut LogHubRef, index: Index) -> Index {
-    let mut iter_down = data.iter_forward_from(index.clone());
+  fn next<F>(&mut self, matcher: F, error: Error) -> Index
+  where
+    F: Fn(&LogLine) -> bool,
+  {
+    let index = std::mem::take(&mut self.index);
+    let mut iter_down = self.data.iter_forward_from(index.clone());
     iter_down.next();
-    match self.find_first_content_matched(iter_down) {
+
+    match Self::search_first_matched(iter_down, matcher) {
+      Some(index) => index,
       None => {
-        self.error = Some(Error::NextContentSearchNotFound);
+        self.error = Some(error);
         index
       }
-      Some(index) => index,
     }
   }
 
-  /// 定位到上一条搜索内容匹配的日志
-  fn locate_prev_content_search(&mut self, data: &mut LogHubRef, index: Index) -> Index {
-    let mut iter_up = data.iter_backward_from(index.clone());
+  fn prev<F>(&mut self, matcher: F, error: Error) -> Index
+  where
+    F: Fn(&LogLine) -> bool,
+  {
+    let index = std::mem::take(&mut self.index);
+    let mut iter_up = self.data.iter_backward_from(index.clone());
     iter_up.next();
-    match self.find_first_content_matched(iter_up) {
+
+    match Self::search_first_matched(iter_up, matcher) {
+      Some(index) => index,
       None => {
-        self.error = Some(Error::PrevContentSearchNotFound);
+        self.error = Some(error);
         index
       }
-      Some(index) => index,
     }
   }
 
-  /// 给定迭代器，往后遍历，寻找第一条匹配搜索内容的日志
-  fn find_first_content_matched<'a>(
-    &self,
-    iter: impl Iterator<Item = LogItem<'a>>,
-  ) -> Option<Index> {
-    let search = self.content_search.as_ref()?;
-
+  fn search_first_matched<'c, I, F>(iter: I, matcher: F) -> Option<Index>
+  where
+    I: Iterator<Item = LogItem<'c>>,
+    F: Fn(&LogLine) -> bool,
+  {
     for (index, log) in iter {
-      if log.get_content().find(search).is_some() {
+      if matcher(&log) {
         return Some(index);
       }
     }
 
     None
+  }
+}
+
+impl LogController {
+  fn mark_matcher(&self) -> impl Fn(&LogLine) -> bool {
+    LogLine::is_marked
+  }
+
+  fn content_matcher(&self) -> impl Fn(&LogLine) -> bool {
+    |log: &LogLine| log.get_content().contains(&self.get_search_content())
+  }
+
+  fn get_time_matcher(&self) -> Option<&TimeMatcher> {
+    match self.timestamp_matcher.as_ref() {
+      Some(Ok(tm)) => Some(tm),
+      _ => None,
+    }
+  }
+
+  fn timestamp_matcher(&self, tm: &TimeMatcher) -> impl Fn(&LogLine) -> bool {
+    move |log: &LogLine| match log.get_timestamp() {
+      None => false,
+      Some(dt) => tm.is_matched(dt),
+    }
   }
 
   /// 定位光标指向的数据索引。因为可能标签过滤规则的变化，会导致原来光标指向的数据不可见了
@@ -425,6 +511,22 @@ impl LogController {
       }
     }
   }
+
+  /// 设置时间戳过滤属性。仅时间戳过滤状态启用时有效
+  fn set_timestamp_matching_properties(&mut self) {
+    match self.timestamp_matcher.as_ref() {
+      None => {}
+      Some(Err(msg)) => {
+        self.error = Some(Error::TimestampSearchFormatError(msg.clone()));
+      }
+      Some(Ok(tm)) => self.view_port.data.iter_mut().for_each(|(_, log, props)| {
+        props.timestamp_matched = match log.get_timestamp() {
+          None => false,
+          Some(dt) => tm.is_matched(dt),
+        }
+      }),
+    }
+  }
 }
 
 impl Controller for LogController {
@@ -439,7 +541,7 @@ impl Controller for LogController {
     let (cursor_index, cursor_expectation) = self
       .view_port
       .apply()
-      .map(|((i, _), e)| (i.clone(), e))
+      .map(|((i, ..), e)| (i.clone(), e))
       .unwrap_or_else(|| (data.last_index(), CursorExpectation::None));
 
     // 重定位索引，确保它光标总是指向可见的数据
@@ -456,20 +558,40 @@ impl Controller for LogController {
           log.toggle_mark();
         }
       }
-      Control::NextMarked => {
-        cursor_index = self.locate_next_marked(data, cursor_index);
-      }
-      Control::PrevMarked => {
-        cursor_index = self.locate_prev_marked(data, cursor_index);
-      }
-      Control::LocateContentSearch => {
-        cursor_index = self.locate_nearest_content_search(data, cursor_index);
-      }
-      Control::NextContentSearch => {
-        cursor_index = self.locate_next_content_search(data, cursor_index);
-      }
-      Control::PrevContentSearch => {
-        cursor_index = self.locate_prev_content_search(data, cursor_index);
+      _ => {
+        // 处理搜索
+        let mut searcher = Searcher::new(data, cursor_index.clone());
+        cursor_index = match self.control {
+          Control::NextMarked => searcher.next(self.mark_matcher(), Error::NextMarkedNotFound),
+          Control::PrevMarked => searcher.prev(self.mark_matcher(), Error::PrevMarkedNotFound),
+          Control::LocateContentSearch => searcher.nearest(self.content_matcher()),
+          Control::NextContentSearch => {
+            searcher.next(self.content_matcher(), Error::NextContentSearchNotFound)
+          }
+          Control::PrevContentSearch => {
+            searcher.prev(self.content_matcher(), Error::PrevContentSearchNotFound)
+          }
+          Control::LocateTimestampSearch => self.get_time_matcher().map_or(cursor_index, |tm| {
+            searcher.nearest(self.timestamp_matcher(&tm))
+          }),
+          Control::NextTimestampSearch => self.get_time_matcher().map_or(cursor_index, |tm| {
+            searcher.next(
+              self.timestamp_matcher(&tm),
+              Error::NextTimestampSearchNotFound,
+            )
+          }),
+          Control::PrevTimestampSearch => self.get_time_matcher().map_or(cursor_index, |tm| {
+            searcher.prev(
+              self.timestamp_matcher(&tm),
+              Error::PrevTimestampSearchNotFound,
+            )
+          }),
+          _ => {
+            todo!()
+          }
+        };
+
+        self.error = searcher.error;
       }
     }
     self.control = Control::Idle;
@@ -477,12 +599,15 @@ impl Controller for LogController {
     // 基于当前的光标位置，及其指向的数据索引，填充整个展示区
     self.view_port.fill(data, cursor_index);
 
+    // 设置时间戳过滤结果（如果有的话）
+    self.set_timestamp_matching_properties();
+
     // 如果存在数据顶到头，触发更老的日志加载
     let first_index = self
       .view()
       .data
       .front()
-      .map(|(first_index, _)| first_index.clone())
+      .map(|(first_index, ..)| first_index.clone())
       .unwrap_or(data.first_index());
     data.try_load_older_logs(&first_index);
   }

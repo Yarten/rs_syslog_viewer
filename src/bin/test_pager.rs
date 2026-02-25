@@ -13,7 +13,7 @@ fn run(terminal: &mut DefaultTerminal, mut pager: Pager) -> Result<()> {
         match key.code {
           KeyCode::Enter => {
             let input = pager.status().get_input().unwrap().clone();
-            pager.status().set_info(input);
+            pager.status().set_tips(input);
             input_mode = false;
           }
           KeyCode::Char(to_insert) => pager.status().enter_char(to_insert),
@@ -23,7 +23,7 @@ fn run(terminal: &mut DefaultTerminal, mut pager: Pager) -> Result<()> {
           KeyCode::Left => pager.status().move_cursor_left(),
           KeyCode::Right => pager.status().move_cursor_right(),
           KeyCode::Esc => {
-            pager.status().set_info("");
+            pager.status().set_tips("");
             input_mode = false;
           }
           _ => {}

@@ -33,19 +33,15 @@ impl LogStateKit {
   }
 
   /// 设置读取到错误时，在状态栏展示的错误信息
-  pub fn errors(mut self, errors: &[(Error, &str)]) -> Self {
+  pub fn error(mut self, act: impl Fn(Error) -> Option<String> + 'static) -> Self {
     let ctrl = self.log_controller.clone();
-    let errors: BTreeMap<Error, String> = errors
-      .iter()
-      .map(|(error, msg)| (*error, msg.to_string()))
-      .collect();
     let mut is_error_reset = true;
 
     self.state = self.state.manual_action(move |pager| {
       if let Some(error) = ctrl.borrow_mut().take_error()
-        && let Some(msg) = errors.get(&error)
+        && let Some(msg) = act(error)
       {
-        pager.status().set_error(msg);
+        pager.status().set_critical(msg);
         is_error_reset = false;
       } else if !is_error_reset {
         is_error_reset = true;

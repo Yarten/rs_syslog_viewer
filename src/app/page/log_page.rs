@@ -1,20 +1,17 @@
 use crate::app::controller::log_controller::{PidStyle, TagStyle, TimestampStyle};
 use crate::{
   app::{
-    controller::{LogController, log_controller::Style},
+    controller::{
+      LogController,
+      log_controller::{Properties, Style},
+    },
     rich,
   },
-  log::LogLine,
+  log::{Label, LogLine},
   ui::{Page, PageState, ViewPortRenderEx},
 };
 use chrono::{DateTime, FixedOffset};
-use ratatui::{
-  buffer::Buffer,
-  layout::Rect,
-  prelude::*,
-  text::{self, Span},
-  widgets::ListItem,
-};
+use ratatui::{buffer::Buffer, layout::Rect, prelude::*, text::Span};
 use std::{borrow::Cow, cell::RefCell, rc::Rc};
 
 pub struct Config {
@@ -48,8 +45,8 @@ impl Page for LogPage {
       .log_controller
       .borrow_mut()
       .view_mut()
-      .render(area, buf, state.focus, |(_, i)| {
-        self.render_log_line(i, style, search)
+      .render(area, buf, state.focus, |(_, i, p)| {
+        self.render_log_line(i, style, search, &p)
       });
   }
 
@@ -60,7 +57,13 @@ impl Page for LogPage {
 
 impl LogPage {
   /// 为给定的日志行，创建可渲染的列表项
-  fn render_log_line<'a>(&self, log: &'a LogLine, style: Style, search: &str) -> Line<'a> {
+  fn render_log_line<'a>(
+    &self,
+    log: &'a LogLine,
+    style: Style,
+    search: &str,
+    properties: &Properties,
+  ) -> Line<'a> {
     let mut line = Line::default();
 
     if log.is_marked() {
@@ -70,7 +73,12 @@ impl LogPage {
     match log {
       // 正常日志
       LogLine::Good(log) => {
-        line.push_span(self.get_timestamp_span(&style, &log.timestamp).cyan());
+        let mut timestamp_span = self.get_timestamp_span(&style, &log.timestamp).cyan();
+        if properties.timestamp_matched {
+          timestamp_span = timestamp_span.reversed();
+        }
+
+        line.push_span(timestamp_span);
         line.push_span(Span::raw(" "));
 
         if let Some(span) = self.get_tag_span(&style, &log.tag) {
@@ -83,6 +91,12 @@ impl LogPage {
           line.push_span(span.yellow());
           line.push_span(Span::raw("]").bold().white());
           line.push_span(Span::raw(" "));
+        }
+
+        match log.label {
+          Label::Unknown => {}
+          Label::Warn => line.push_span(Span::raw("⚠️")),
+          Label::Error => line.push_span(Span::raw("❌️")),
         }
 
         rich(&mut line, &log.message, search);

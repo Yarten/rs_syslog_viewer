@@ -27,7 +27,7 @@ impl StateBuilder for QuitState {
     let ctrl = self.app_controller;
     self
       .state
-      .enter_action(|pager| pager.status().set_error("Quit or not ? Y/n"))
+      .enter_action(|pager| pager.status().set_critical("Quit or not ? Y/n"))
       .action(KeyEvent::simple(KeyCode::Char('y')), move |_| {
         ctrl.borrow_mut().quit();
       })
