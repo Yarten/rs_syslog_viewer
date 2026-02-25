@@ -134,7 +134,22 @@ impl Controller for TagController {
     let cursor_key = self.relocate_cursor(cursor_key, cursor_expectation);
 
     // 填充数据
-    self.view_port.fill(&self.matched_tags, cursor_key)
+    self.view_port.fill(&self.matched_tags, cursor_key);
+
+    // 找到最大数据数量，以及展示区内第一条数据在整体中的位置，提供纵向滚动条的渲染数据
+    let top_item_position = match self.view_port.data.front() {
+      None => 0,
+      Some((top_key, _)) => self
+        .matched_tags
+        .iter()
+        .position(|(k, _)| k == top_key)
+        .unwrap_or(0),
+    };
+
+    self
+      .view_port
+      .ui
+      .update_vertical_scroll_state(self.matched_tags.len(), top_item_position);
   }
 
   fn view_port(&mut self) -> Option<&mut ViewPortBase> {

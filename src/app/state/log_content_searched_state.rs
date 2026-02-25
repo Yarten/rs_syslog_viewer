@@ -1,6 +1,5 @@
 use super::log_state_kit::LogStateKit;
 use crate::app::controller::log_controller::Error;
-use crate::ui::StatusBar;
 use crate::{
   app::{StateBuilder, ViewPortStateEx, controller::LogController},
   ui::{KeyEventEx, State},

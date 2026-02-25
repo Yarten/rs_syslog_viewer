@@ -28,6 +28,12 @@ pub enum Control {
   PageDown,
 }
 
+#[derive(Default, Copy, Clone)]
+struct VerticalScrollState {
+  items_count: usize,
+  position: usize,
+}
+
 #[derive(Default)]
 pub struct ViewPort {
   /// 展示区的高度，也即能够展示的日志行数量
@@ -50,6 +56,10 @@ pub struct ViewPort {
   /// 横向滚动条当前的位置。它的总长度将动态计算，位置也会动态钳制。
   /// 如果位置设置为 None，则没有横向滚动能力。
   horizontal_scroll_position: Option<usize>,
+
+  /// 纵向滚动条的状态，其中的内容数量以及滚动条位置需要外部设置。
+  /// 如果条目数量为零，则不会展示纵向滚动条，但仍然具备纵向滚动能力。
+  vertical_scroll_state: VerticalScrollState,
 }
 
 /// 扩展 view port 数据的能力，假设了 view port 数据是由 Key 和 Value 组成的元组
@@ -191,7 +201,13 @@ pub trait ViewPortEx {
 
 /// 扩展 [ViewPort] 渲染到终端的能力
 pub trait ViewPortRenderEx: ViewPortEx {
-  fn render(&mut self, area: Rect, buf: &mut Buffer, focus: bool, f: impl Fn(&Self::Item) -> Line) {
+  fn render(
+    &mut self,
+    mut area: Rect,
+    buf: &mut Buffer,
+    focus: bool,
+    f: impl Fn(&Self::Item) -> Line,
+  ) {
     // 组装渲染条目
     let mut items: Vec<Line> = self.data().iter().map(|i| f(i)).collect();
 
@@ -240,6 +256,31 @@ pub trait ViewPortRenderEx: ViewPortEx {
     }
 
     // -----------------------------------------------------------
+    // 调整并渲染纵向滚动条的位置
+    let mut vertical_scroll_state = self.ui().vertical_scroll_state;
+    {
+      // 可滚动的范围
+      let area_height = area.height as usize;
+      let scroll_range = if vertical_scroll_state.items_count > area_height {
+        vertical_scroll_state.items_count - area_height
+      } else {
+        0
+      };
+
+      // 确保滚动条位置在可滚动范围内
+      vertical_scroll_state.position = vertical_scroll_state
+        .position
+        .min(scroll_range.saturating_sub(1));
+
+      // 渲染滚动条。滚动条处于页面框内部，不和边框重叠
+      if scroll_range > 0 {
+        let mut state = ScrollbarState::new(scroll_range).position(vertical_scroll_state.position);
+        Scrollbar::new(ScrollbarOrientation::VerticalRight).render(area, buf, &mut state);
+        area.width = area.width.saturating_sub(1);
+      }
+    }
+
+    // -----------------------------------------------------------
     // 高亮光标指向的数据
     if focus && let Some(line) = items.get_mut(self.ui().cursor) {
       // 若本行的宽度小于可视区的宽度，我们需要在其后方补充空白格，否则高亮区域没法横穿整个行，看起来会比较奇怪。
@@ -266,6 +307,7 @@ pub trait ViewPortRenderEx: ViewPortEx {
 
     // 更新滚动条位置
     ui.horizontal_scroll_position = horizontal_scroll_position;
+    ui.vertical_scroll_state = vertical_scroll_state;
 
     // 由于现在访问得到的 controller 数据都是基于之前的事实计算的，
     // 因此，我们只能在渲染的最后，再给 controller 更新最新的窗口大小
@@ -277,6 +319,12 @@ impl ViewPort {
   /// 启用横向滚动条
   pub fn enable_horizontal_scroll(&mut self) {
     self.horizontal_scroll_position = Some(0);
+  }
+
+  /// 手动设置纵向滚动条条目上限以及展示区首条数据的位置
+  pub fn update_vertical_scroll_state(&mut self, items_count: usize, top_item_index: usize) {
+    self.vertical_scroll_state.items_count = items_count;
+    self.vertical_scroll_state.position = top_item_index;
   }
 
   /// 移动横向滚动条，向左为负，向右为正。

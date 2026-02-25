@@ -24,7 +24,6 @@ impl LogNavigationState {
 impl StateBuilder for LogNavigationState {
   fn build(self) -> State {
     let c1 = self.kit.log_controller.clone();
-    let c2 = c1.clone();
 
     self
       .kit

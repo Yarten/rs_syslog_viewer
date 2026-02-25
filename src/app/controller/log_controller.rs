@@ -3,7 +3,6 @@ use crate::{
   log::{LogDirection, LogLine},
   ui::CursorExpectation,
 };
-use chrono::{DateTime, FixedOffset};
 use std::{path::PathBuf, sync::Arc};
 
 /// 描述一条日志的其他属性，表征 viewer 其他渲染需求
@@ -154,7 +153,7 @@ impl Style {
         type_index: 3,
       },
       _ => {
-        todo!()
+        unreachable!()
       }
     };
 
@@ -587,7 +586,7 @@ impl Controller for LogController {
             )
           }),
           _ => {
-            todo!()
+            unreachable!()
           }
         };
 

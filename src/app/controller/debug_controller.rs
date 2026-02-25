@@ -13,8 +13,8 @@ type Item = (usize, LogItem);
 crate::view_port!(ViewPort, Item);
 
 impl ViewPort {
-  /// 加锁调试数据缓冲区，取出展示区里需要的那些
-  fn fill(&mut self, mut index: usize) {
+  /// 加锁调试数据缓冲区，取出展示区里需要的那些。返回日志总数量
+  fn fill(&mut self, mut index: usize) -> usize {
     if let Some(buffer) = debug::BUFFER.lock().unwrap().as_ref() {
       let buffer = buffer.data();
       index = index.clamp(0, buffer.len().saturating_sub(1));
@@ -25,7 +25,12 @@ impl ViewPort {
       self.do_fill(|dir| match dir {
         LogDirection::Forward => iter_down.next().map(|(a, b)| (a, b.clone())),
         LogDirection::Backward => iter_up.next().map(|(a, b)| (a, b.clone())),
-      })
+      });
+
+      // 返回调试日志总数量
+      buffer.len()
+    } else {
+      0
     }
   }
 }
@@ -70,8 +75,17 @@ impl Controller for DebugController {
       CursorExpectation::MoreDown => cursor_index.saturating_add(1),
     };
 
-    // 取出数据，填充展示区
-    self.view_port.fill(cursor_index);
+    // 取出数据，填充展示区，并启发数据区最大数量，以及顶层数据在整体中的索引，以展示纵向滚动条
+    let total_count = self.view_port.fill(cursor_index);
+    self.view_port.ui.update_vertical_scroll_state(
+      total_count,
+      self
+        .view_port
+        .data
+        .front()
+        .map(|(idx, _)| *idx)
+        .unwrap_or(0),
+    );
   }
 
   fn view_port(&mut self) -> Option<&mut ViewPortBase> {

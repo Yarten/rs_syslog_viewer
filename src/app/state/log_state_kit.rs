@@ -3,8 +3,6 @@ use crate::{
   ui::State,
 };
 use crossterm::event::KeyEvent;
-use std::borrow::Cow;
-use std::collections::{BTreeMap, HashMap};
 use std::{cell::RefCell, rc::Rc};
 
 pub(super) struct LogStateKit {
