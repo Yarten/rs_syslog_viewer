@@ -320,6 +320,11 @@ impl LogLine {
     }
   }
 
+  /// 是否是损坏的日志
+  pub fn is_bad(&self) -> bool {
+    matches!(self, Bad(_))
+  }
+
   /// 获取日志中的时间戳
   pub fn get_timestamp(&self) -> Option<DateTime<FixedOffset>> {
     match self {

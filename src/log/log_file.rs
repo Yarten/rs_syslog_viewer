@@ -66,11 +66,17 @@ impl LogFile {
         match event {
           Event::NewHead(s) => {
             let new_log = LogLine::new(s);
+            if new_log.is_bad() {
+              continue;
+            }
             self.update_data_board(&new_log, &data_board).await;
             self.content.push_front(new_log);
           }
           Event::NewTail(s) => {
             let new_log = LogLine::new(s);
+            if new_log.is_bad() {
+              continue;
+            }
             self.update_data_board(&new_log, &data_board).await;
             self.content.push_back(new_log);
           }

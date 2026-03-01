@@ -46,10 +46,12 @@ impl StateBuilder for LogNavigationState {
         ctrl.toggle_mark()
       })
       .action(KeyEvent::simple(KeyCode::Char('[')), |ctrl| {
-        ctrl.prev_mark()
+        ctrl.prev_mark();
+        ctrl.view_mut().ui_mut().do_not_follow();
       })
       .action(KeyEvent::simple(KeyCode::Char(']')), |ctrl| {
-        ctrl.next_mark()
+        ctrl.next_mark();
+        ctrl.view_mut().ui_mut().do_not_follow();
       })
       .error(|e| match e {
         Error::NextMarkedNotFound => {

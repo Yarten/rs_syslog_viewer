@@ -103,7 +103,7 @@ impl LogPage {
       }
 
       // 坏的日志
-      LogLine::Bad(log) => line.push_span(Span::raw(&log.content).on_red()),
+      LogLine::Bad(log) => line.push_span(Span::raw(&log.content).red()),
     }
 
     if log.is_marked() {
